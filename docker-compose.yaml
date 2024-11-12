@@ -1,0 +1,54 @@
+version: '3.8'
+
+services:
+  frontend:
+    build:
+      context: ./frontend
+    container_name: frontend
+    ports:
+      - "3003:80"  # React app served via Nginx
+    depends_on:
+      - backend
+      - orientdb
+    environment:
+      - REACT_APP_API_URL=http://localhost:8000  # FastAPI backend URL
+    networks:
+      - app-network
+
+  backend:
+    build:
+      context: ./backend
+    container_name: backend
+    ports:
+      - "8008:8008"
+    depends_on:
+      - orientdb
+    environment:
+      - ORIENTDB_HOST=orientdb
+      - ORIENTDB_PORT=2424
+      - ORIENTDB_USER=root
+      - ORIENTDB_PASSWORD=rootpwd
+    networks:
+      - app-network
+
+  orientdb:
+    image: orientdb:3.2.2
+    container_name: orientdb
+    environment:
+      ORIENTDB_ROOT_PASSWORD: rootpwd
+      ORIENTDB_PORT: 2424
+    ports:
+      - "2424:2424"
+      - "2480:2480"  # OrientDB Studio web interface
+    volumes:
+      - orientdb-data:/orientdb/databases
+    networks:
+      - app-network
+
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  orientdb-data:
+
