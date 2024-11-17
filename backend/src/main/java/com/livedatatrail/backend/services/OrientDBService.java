@@ -40,6 +40,21 @@ public class OrientDBService {
 
         pool = new ODatabasePool(orientDB, "main", username, password, poolConfig);
         logger.info("OrientDB connection pool initialized.");
+
+        withSession(session -> {
+            if (session.getClass("Location") == null) {
+                session.createVertexClass("Location");
+                logger.info("Created vertex class: Location");
+            }
+            if (session.getClass("Item") == null) {
+                session.createVertexClass("Item");
+                logger.info("Created vertex class: Item");
+            }
+            if (session.getClass("HasPosition") == null) {
+                session.createEdgeClass("HasPosition");
+                logger.info("Created edge class: HasPosition");
+            }
+        });
     }
 
     @PreDestroy
@@ -66,7 +81,7 @@ public class OrientDBService {
         void execute(ODatabaseSession session);
     }
 
-        public ODatabaseSession getSession() {
+    public ODatabaseSession getSession() {
         return pool.acquire();
     }
 }

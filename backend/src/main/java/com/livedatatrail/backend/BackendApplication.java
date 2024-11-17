@@ -14,20 +14,6 @@ import com.orientechnologies.orient.core.sql.executor.OResultSet;
 public class BackendApplication {
 
 	public static void main(String[] args) {
-		var orientDB = new OrientDB("remote:localhost", "root", "rootpwd", OrientDBConfig.defaultConfig());
-        // orientDB.createIfNotExists("main", ODatabaseType.MEMORY);
-        var db = orientDB.open("main", "root", "rootpwd");
-		// db.getMetadata().getSchema().dropClass("Location");
-		OClass location = db.getClass("Location");
-		if (location == null){
-			db.createVertexClass("Location");
-		}
-		OClass item = db.getClass("Item");
-		if (item == null){
-			db.createVertexClass("Item");
-		}
-		db.close();
-		orientDB.close();
 		SpringApplication.run(BackendApplication.class, args);
 	}
 

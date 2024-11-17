@@ -1,12 +1,12 @@
 package com.livedatatrail.backend.services;
 
 import com.livedatatrail.backend.models.Item;
+import com.livedatatrail.backend.models.input.ItemInput;
+import com.livedatatrail.backend.utils.OrientDBUtils;
 import com.orientechnologies.orient.core.db.ODatabaseSession;
 import com.orientechnologies.orient.core.id.ORID;
 import com.orientechnologies.orient.core.id.ORecordId;
 import com.orientechnologies.orient.core.record.OVertex;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
@@ -18,7 +18,6 @@ import java.util.Map;
 public class ItemService {
 
     private final OrientDBService orientDBService;
-    private static final Logger logger = LoggerFactory.getLogger(ItemService.class);
 
     @Autowired
     public ItemService(OrientDBService orientDBService) {
@@ -26,7 +25,6 @@ public class ItemService {
     }
 
     public List<Item> getAllItems() {
-        logger.info("Fetching all items...");
         List<Item> items = new ArrayList<>();
         try (ODatabaseSession db = orientDBService.getSession()) {
             try (var rs = db.query("SELECT * FROM Item")) {
@@ -35,44 +33,43 @@ public class ItemService {
                     row.getVertex().ifPresent(vertex -> {
                         Item item = vertexToItem(vertex);
                         items.add(item);
-                        logger.debug("Item found: {}", item);
                     });
                 }
             }
         } catch (Exception e) {
-            logger.error("Error while fetching items: {}", e.getMessage());
+            throw new RuntimeException("Error while fetching items: " + e.getMessage(), e);
         }
         return items;
     }
 
     public Item getItemById(String id) {
-        logger.info("Fetching item with ID: {}", id);
         try (ODatabaseSession db = orientDBService.getSession()) {
             ORID theRid = new ORecordId(id);
             OVertex vertex = db.load(theRid);
             return vertex != null ? vertexToItem(vertex) : null;
         } catch (Exception e) {
-            logger.error("Error while fetching item: {}", e.getMessage());
-            return null;
+            throw new RuntimeException("Error while fetching item with ID " + id + ": " + e.getMessage(), e);
         }
     }
 
-    public Item createItem(String name, Map<String, Object> properties) {
-        logger.info("Creating new item with name: {}", name);
+    public Item createItem(ItemInput item) {
         try (ODatabaseSession db = orientDBService.getSession()) {
+            if (OrientDBUtils.checkIfAlreadyExists(db, item.getId())) {
+                throw new IllegalArgumentException("Item with id " + item.getId() + " already exists.");
+            }
             OVertex vertex = db.newVertex("Item");
-            vertex.setProperty("name", name);
-            vertex.setProperty("properties", properties);
+            vertex.setProperty("customId", item.getId());
+            vertex.setProperty("name", item.getName());
+            vertex.setProperty("properties", item.getProperties());
             vertex.save();
             return vertexToItem(vertex);
         } catch (Exception e) {
-            logger.error("Error while creating item: {}", e.getMessage());
-            return null;
+            throw new RuntimeException("Error while creating item with name " + item.getName() + ": " + e.getMessage(),
+                    e);
         }
     }
 
     public Item updateItem(String id, String name, Map<String, Object> properties) {
-        logger.info("Updating item with ID: {}", id);
         try (ODatabaseSession db = orientDBService.getSession()) {
             ORID theRid = new ORecordId(id);
             OVertex vertex = db.load(theRid);
@@ -82,36 +79,29 @@ public class ItemService {
                 vertex.save();
                 return vertexToItem(vertex);
             } else {
-                logger.warn("Item with ID: {} not found", id);
-                return null;
+                throw new IllegalArgumentException("Item with ID: " + id + " not found.");
             }
         } catch (Exception e) {
-            logger.error("Error while updating item: {}", e.getMessage());
-            return null;
+            throw new RuntimeException("Error while updating item with ID " + id + ": " + e.getMessage(), e);
         }
     }
 
     public void deleteItem(String id) {
-        logger.info("Deleting item with ID: {}", id);
         try (ODatabaseSession db = orientDBService.getSession()) {
             ORID theRid = new ORecordId(id);
             OVertex vertex = db.load(theRid);
             if (vertex != null) {
                 vertex.delete();
-                logger.info("Item with ID: {} deleted", id);
             } else {
-                logger.warn("Item with ID: {} not found", id);
+                throw new IllegalArgumentException("Item with ID: " + id + " not found.");
             }
         } catch (Exception e) {
-            logger.error("Error while deleting item: {}", e.getMessage());
+            throw new RuntimeException("Error while deleting item with ID " + id + ": " + e.getMessage(), e);
         }
     }
 
     private Item vertexToItem(OVertex vertex) {
-        return new Item(
-            vertex.getIdentity().toString(),
-            vertex.getProperty("name"),
-            vertex.getProperty("properties")
-        );
+        return new Item(vertex.getProperty("customId").toString(), vertex.getProperty("name"),
+                vertex.getProperty("properties"));
     }
 }
