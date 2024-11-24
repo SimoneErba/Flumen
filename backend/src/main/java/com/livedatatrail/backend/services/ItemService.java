@@ -1,7 +1,6 @@
 package com.livedatatrail.backend.services;
 
 import com.livedatatrail.backend.models.Item;
-import com.livedatatrail.backend.models.UpdateModel;
 import com.livedatatrail.backend.models.input.ItemInput;
 import com.livedatatrail.backend.utils.OrientDBUtils;
 import com.orientechnologies.orient.core.db.ODatabaseSession;
@@ -19,12 +18,10 @@ import java.util.Map;
 public class ItemService {
 
     private final OrientDBService orientDBService;
-    private final UpdateService updateService;
 
     @Autowired
-    public ItemService(OrientDBService orientDBService, UpdateService updateService) {
+    public ItemService(OrientDBService orientDBService) {
         this.orientDBService = orientDBService;
-        this.updateService = updateService;
     }
 
     public List<Item> getAllItems() {
@@ -47,8 +44,9 @@ public class ItemService {
 
     public Item getItemById(String id) {
         try (ODatabaseSession db = orientDBService.getSession()) {
-            var item = OrientDBUtils.loadAndValidateVertexByCustomId(db, id);
-            return item != null ? vertexToItem(item) : null;
+            ORID theRid = new ORecordId(id);
+            OVertex vertex = db.load(theRid);
+            return vertex != null ? vertexToItem(vertex) : null;
         } catch (Exception e) {
             throw new RuntimeException("Error while fetching item with ID " + id + ": " + e.getMessage(), e);
         }
@@ -71,8 +69,21 @@ public class ItemService {
         }
     }
 
-    public Item updateItem(UpdateModel model) {
-        return vertexToItem(this.updateService.updateVertex(model));
+    public Item updateItem(String id, String name, Map<String, Object> properties) {
+        try (ODatabaseSession db = orientDBService.getSession()) {
+            ORID theRid = new ORecordId(id);
+            OVertex vertex = db.load(theRid);
+            if (vertex != null) {
+                vertex.setProperty("name", name);
+                vertex.setProperty("properties", properties);
+                vertex.save();
+                return vertexToItem(vertex);
+            } else {
+                throw new IllegalArgumentException("Item with ID: " + id + " not found.");
+            }
+        } catch (Exception e) {
+            throw new RuntimeException("Error while updating item with ID " + id + ": " + e.getMessage(), e);
+        }
     }
 
     public void deleteItem(String id) {
