@@ -1,6 +1,8 @@
 package com.livedatatrail.backend.services;
 
 import com.livedatatrail.backend.models.Location;
+import com.livedatatrail.backend.models.UpdateModel;
+import com.livedatatrail.backend.models.input.LocationInput;
 import com.livedatatrail.backend.utils.OrientDBUtils;
 import com.orientechnologies.orient.core.db.ODatabaseSession;
 import com.orientechnologies.orient.core.id.ORID;
@@ -18,10 +20,12 @@ import java.util.List;
 public class LocationService {
 
     private final OrientDBService orientDBService;
+    private final UpdateService updateService;
 
     @Autowired
-    public LocationService(OrientDBService orientDBService) {
+    public LocationService(OrientDBService orientDBService, UpdateService updateService) {
         this.orientDBService = orientDBService;
+        this.updateService = updateService;
     }
 
     public List<Location> getAllLocations() {
@@ -54,39 +58,26 @@ public class LocationService {
         }
     }
 
-    public Location createLocation(String name, double latitude, double longitude) {
+    public Location createLocation(LocationInput location) {
         try (ODatabaseSession db = orientDBService.getSession()) {
-            if (OrientDBUtils.checkIfAlreadyExists(db, name)) {
-                throw new IllegalArgumentException("Location with name " + name + " already exists.");
+            if (OrientDBUtils.checkIfAlreadyExists(db, location.getId())) {
+                throw new IllegalArgumentException("Location with name " + location.getName() + " already exists.");
             }
             OVertex vertex = db.newVertex("Location");
-            vertex.setProperty("name", name);
-            vertex.setProperty("latitude", latitude);
-            vertex.setProperty("longitude", longitude);
+            vertex.setProperty("name", location.getName());
+            vertex.setProperty("customId", location.getId());
+            vertex.setProperty("latitude", location.getLatitude());
+            vertex.setProperty("longitude", location.getLongitude());
             vertex.save();
-            var location = vertexToLocation(vertex);
-            return location;
+            return vertexToLocation(vertex);
         } catch (Exception e) {
-            throw new RuntimeException("Error while creating location with name " + name + ": " + e.getMessage(), e);
+            throw new RuntimeException(
+                    "Error while creating location with name " + location.getName() + ": " + e.getMessage(), e);
         }
     }
 
-    public Location updateLocation(String id, String name, double latitude, double longitude) {
-        try (ODatabaseSession db = orientDBService.getSession()) {
-            ORID theRid = new ORecordId(id);
-            OVertex vertex = db.load(theRid);
-            if (vertex != null) {
-                vertex.setProperty("name", name);
-                vertex.setProperty("latitude", latitude);
-                vertex.setProperty("longitude", longitude);
-                vertex.save();
-                return vertexToLocation(vertex);
-            } else {
-                throw new IllegalArgumentException("Location with ID: " + id + " not found.");
-            }
-        } catch (Exception e) {
-            throw new RuntimeException("Error while updating location with ID " + id + ": " + e.getMessage(), e);
-        }
+    public Location updateLocation(UpdateModel model) {
+        return vertexToLocation(this.updateService.updateVertex(model));
     }
 
     public void deleteLocation(String id) {

@@ -1,6 +1,7 @@
 package com.livedatatrail.backend.controllers;
 
 import com.livedatatrail.backend.models.Item;
+import com.livedatatrail.backend.models.UpdateModel;
 import com.livedatatrail.backend.models.input.ItemInput;
 import com.livedatatrail.backend.models.input.LocationInput;
 import com.livedatatrail.backend.services.ItemService;
@@ -40,10 +41,9 @@ public class ItemController {
         return ResponseEntity.ok(newItem);
     }
 
-    @PutMapping("/{id}")
-    public ResponseEntity<Item> updateItem(@PathVariable String id, @RequestBody String name,
-            @RequestBody Map<String, Object> properties) {
-        Item updatedItem = itemService.updateItem(id, name, properties);
+    @PutMapping()
+    public ResponseEntity<Item> updateItem(@RequestBody UpdateModel model) {
+        Item updatedItem = itemService.updateItem(model);
         return updatedItem != null ? ResponseEntity.ok(updatedItem) : ResponseEntity.notFound().build();
     }
 

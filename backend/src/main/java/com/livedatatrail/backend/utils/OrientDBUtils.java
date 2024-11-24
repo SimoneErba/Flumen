@@ -19,30 +19,30 @@ public class OrientDBUtils {
 	/**
 	 * Helper method to load and validate an OElement as a vertex.
 	 *
-	 * @param db   the database session
-	 * @param name the name of the element
+	 * @param db the database session
+	 * @param id the name of the element
 	 * @return the loaded and validated OElement
 	 * @throws IllegalArgumentException if the element is not a valid vertex
 	 */
-	public static OVertex loadAndValidateVertexByName(ODatabaseSession db, String name) {
-		String statement = "SELECT * FROM V WHERE name = ?";
-		OResultSet rs = db.query(statement, name);
+	public static OVertex loadAndValidateVertexByCustomId(ODatabaseSession db, String id) {
+		String statement = "SELECT * FROM V WHERE customId = ?";
+		OResultSet rs = db.query(statement, id);
 		if (rs.hasNext()) {
 			OResult row = rs.next();
 			OElement element = row.toElement();
 
 			if (element == null || !element.isVertex()) {
 				throw new IllegalArgumentException(
-						String.format("Provided object with name %s is not a valid vertex.", name));
+						String.format("Provided object with id %s is not a valid vertex.", id));
 			}
 			return element.asVertex().get();
 		} else {
-			throw new NoSuchElementException(String.format("No vertex found with name %s", name));
+			throw new NoSuchElementException(String.format("No vertex found with id %s", id));
 		}
 	}
 
 	public static boolean checkIfAlreadyExists(ODatabaseSession db, String name) {
-		String statement = "SELECT * FROM V WHERE name = ?";
+		String statement = "SELECT * FROM V WHERE customId = ?";
 		OResultSet rs = db.query(statement, name);
 		return rs.hasNext();
 	}
