@@ -1,7 +1,6 @@
-package com.livedatatrail.backend.models.input;
+package com.livedatatrail.backend.models;
 
 import java.util.Map;
-
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -9,10 +8,7 @@ import lombok.NoArgsConstructor;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class LocationInput {
+public class UpdateModel {
 	private String id;
-	private String name;
-	private double latitude;
-	private double longitude;
 	private Map<String, Object> properties;
 }

@@ -1,7 +1,11 @@
 package com.livedatatrail.backend.controllers;
 
 import com.livedatatrail.backend.models.Location;
+import com.livedatatrail.backend.models.UpdateModel;
+import com.livedatatrail.backend.models.input.LocationInput;
 import com.livedatatrail.backend.services.LocationService;
+import com.livedatatrail.backend.services.UpdateService;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
@@ -29,13 +33,13 @@ public class LocationController {
     }
 
     @PostMapping
-    public Location createLocation(@RequestBody Location location) {
-        return locationService.createLocation(location.getName(), location.getLatitude(), location.getLongitude());
+    public Location createLocation(@RequestBody LocationInput location) {
+        return locationService.createLocation(location);
     }
 
-    @PutMapping("/{id}")
-    public Location updateLocation(@PathVariable String id, @RequestBody Location updatedLocation) {
-        return locationService.updateLocation(id, updatedLocation.getName(), updatedLocation.getLatitude(), updatedLocation.getLongitude());
+    @PutMapping()
+    public Location updateLocation(@RequestBody UpdateModel model) {
+        return locationService.updateLocation(model);
     }
 
     @DeleteMapping("/{id}")
