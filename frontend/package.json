@@ -10,8 +10,18 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@react-sigma/core": "^4.0.3",
+    "@react-sigma/layout-circular": "^4.0.3",
+    "@react-sigma/layout-core": "^4.0.3",
+    "@react-sigma/layout-forceatlas2": "^4.0.3",
+    "@sigma/node-square": "^3.0.0",
+    "d": "^1.0.2",
+    "graphology": "^0.25.4",
+    "graphology-layout": "^0.6.1",
+    "graphology-types": "^0.24.8",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "react-dom": "^18.3.1",
+    "sigma": "^3.0.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.11.1",
