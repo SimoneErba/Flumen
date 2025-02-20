@@ -1,5 +1,5 @@
 import React, { useEffect } from "react";
-import { SigmaContainer, useSigma, useLoadGraph, ControlsContainer, ZoomControl, FullScreenControl } from "@react-sigma/core";
+import { SigmaContainer, useSigma, useLoadGraph, ControlsContainer, ZoomControl, FullScreenControl, useRegisterEvents } from "@react-sigma/core";
 import { MultiDirectedGraph } from "graphology";
 import { NodeSquareProgram } from "@sigma/node-square";
 import "@react-sigma/core/lib/react-sigma.min.css";
@@ -11,24 +11,24 @@ const LoadGraph = () => {
   const sigma = useSigma();
   const graph = new MultiDirectedGraph();
   const loadGraph = useLoadGraph();
-  const [nodePositions, setNodePositions] = useState({});
   const [draggedNode, setDraggedNode] = useState(null);
-  // Define fixed nodes with specific positions
-  const fixedNodes = [
-    { id: "A", x: 0, y: 0 },
-    { id: "B", x: 1, y: 0 },
-    { id: "C", x: 1, y: 1 },
-    { id: "D", x: 0, y: 1 },
-  ];
 
-  const updatedNodes = fixedNodes.map(node => {
-    const position = nodePositions[node.id];
-    return position ? { ...node, x: position.x, y: position.y } : node;
-  });
-  
+  const [graphData, setGraphData] = useState({
+    nodes: [
+      { id: 'A', x: -0.5, y: -0.5 },
+      { id: 'B', x: 0.5, y: -0.5 },
+      { id: 'C', x: 0.5, y: 0.5 },
+      { id: 'D', x: -0.5, y: 0.5 },
+    ],
+    edges: [
+      { source: 'A', target: 'B' },
+      { source: 'B', target: 'C' },
+      { source: 'C', target: 'D' },
+      { source: 'D', target: 'A' },
+    ],
+  });  
 
-  // Add fixed nodes to the graph
-  updatedNodes.forEach(({ id, x, y }) => {
+  graphData.nodes.forEach(({ id, x, y }) => {
     graph.addNode(id, {
       label: `Node ${id}`,
       x,
@@ -38,74 +38,64 @@ const LoadGraph = () => {
     });
   });
 
-  // Add edges between nodes
-  graph.addEdge("A", "B");
-  graph.addEdge("B", "C");
-  graph.addEdge("C", "D");
-  graph.addEdge("D", "A");
+  graphData.edges.forEach((edge) => {
+    graph.addEdge(edge.source, edge.target);
+  })
 
-  // Add an item node (square) starting at node A
   graph.addNode("Item", {
     label: "Item",
     x: 0,
     y: 0,
     size: 8,
     color: "#FF0000",
-    type: "square", // Custom attribute to identify square nodes
+    type: "square",
   });
 
   useEffect(() => {
-    // Load the graph into Sigma
     loadGraph(graph);
 
-    const handleMouseDown = (event) => {
+    const handleMouseDown = (event: { node: any; }) => {
 
       const { node } = event;
       setDraggedNode(node);
-
-      const initialPosition = { x: graph.getNodeAttribute(node, "x"), y: graph.getNodeAttribute(node, "y") };
-      // setNodePositions((prevPositions) => ({
-      //   ...prevPositions,
-      //   [node]: initialPosition,
-      // }));
     };
 
-    const handleMouseMove = (event) => {
+    const handleMouseMove = (event: any) => {
       if (!draggedNode) return;
 
       const pos = sigma.viewportToGraph(event);
 
       graph.setNodeAttribute(draggedNode, "x", pos.x);
       graph.setNodeAttribute(draggedNode, "y", pos.y);
-      // setNodePositions((prevPositions) => ({
-      //   ...prevPositions,
-      //   [draggedNode]: { x: pos.x, y: pos.y },
-      // }));
       event.preventSigmaDefault();
       event.original.preventDefault();
       event.original.stopPropagation();
       sigma.refresh();
     };
 
-    const handleMouseUp = (event) => {
+    const handleMouseUp = (event: any) => {
 
       const pos = sigma.viewportToGraph(event);
 
       if (draggedNode !== null) {
-        setNodePositions((prevPositions) => ({
-          ...prevPositions,
-          [draggedNode]: { x: pos.x, y: pos.y },
-        }));
+        setGraphData((prevData) => {
+          const updatedNodes = prevData.nodes.map((node) =>
+            node.id === draggedNode ? { ...node, x: pos.x, y: pos.y } : node
+          );
+          return { ...prevData, nodes: updatedNodes };
+        });
+        event.original.preventDefault();
+        event.original.stopPropagation()
         setDraggedNode(null);
+      }else{
+        addNode(pos.x, pos.y)
       }
-      // setNodePositions({});
     };
 
     sigma.on("downNode", handleMouseDown);
     sigma.getMouseCaptor().on("mousemove", handleMouseMove);
     sigma.getMouseCaptor().on("mouseup", handleMouseUp);
-    sigma.getMouseCaptor().on("mousedown", handleMouseUp);
-    
+
     // Animation function to move the item along the edges
     let t = 0;
     const speed = 0.01; // Adjust speed as needed
@@ -140,19 +130,54 @@ const LoadGraph = () => {
       sigma.off("downNode", handleMouseDown);
       sigma.getMouseCaptor().removeListener("mousemove", handleMouseMove);
       sigma.getMouseCaptor().removeListener("mouseup", handleMouseUp);
-      sigma.getMouseCaptor().removeListener("mousedown", handleMouseUp);
     };
   }, [sigma, graph, loadGraph, draggedNode]);
 
   const saveGraph = () => {
-    const positions = {};
-    graph.forEachNode((node, attributes) => {
-      positions[node] = { x: attributes.x, y: attributes.y };
-    });
-    // Save positions to local storage or send to backend
-    localStorage.setItem("graphPositions", JSON.stringify(positions));
+
+    localStorage.setItem("graphPositions", JSON.stringify(graphData));
+    console.log("SAVED", graphData)
     alert("Graph layout saved!");
   };
+
+  const addNode = (x, y) => {
+    const newNodeId = crypto.randomUUID();
+    const newNode = {
+      id: newNodeId,
+      x,
+      y,
+      size: 10,
+      fixed: true,
+    };
+
+    // Find the two closest nodes to create edges
+    const closestNodes = graphData.nodes
+      .map((node) => {
+        const distance = Math.pow(x - node.x, 2) + Math.pow(y - node.y, 2);
+        return { nodeId: node.id, distance };
+      })
+      .sort((a, b) => a.distance - b.distance)
+      .slice(0, 2);
+
+    // Update the graph data
+    setGraphData((prevData) => ({
+      nodes: [...prevData.nodes, newNode],
+      edges: [
+        ...prevData.edges,
+        ...closestNodes.map((e) => ({
+          source: newNodeId,
+          target: e.nodeId,
+        })),
+      ],
+    }));
+  };
+
+  // useRegisterEvents({
+  //   clickStage: ({ event }) => {
+  //     const { x, y } = event;
+  //     addNode(x, y);
+  //   },
+  // });
 
     return (
     <div>
@@ -169,6 +194,7 @@ export const DisplayGraph = () => {
       style={sigmaStyle}
       graph={MultiDirectedGraph}
       settings={{
+        autoRescale: true,
         nodeProgramClasses: {
           square: NodeSquareProgram,
         },
