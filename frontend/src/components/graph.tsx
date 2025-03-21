@@ -21,6 +21,7 @@ interface LoadGraphProps {
 }
 
 const LoadGraph = ({initialGraphData}: LoadGraphProps) => {
+  console.log("Initial graph data:", initialGraphData);
   const sigma = useSigma();
   const useloadGraph = useLoadGraph();
   const [draggedNode, setDraggedNode] = useState<string | null>(null);

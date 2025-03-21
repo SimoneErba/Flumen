@@ -1,31 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useApi } from './useApi';
 import { useWebSocket, PositionUpdate, NodeUpdate } from './useWebSocket';
-import { GraphData as ApiGraphData } from '../api-client';
+import { GraphData as ApiGraphData, GraphData } from '../api-client';
 
-export interface Node {
-    id: string;
-    type: 'item' | 'location';
-    properties: Record<string, unknown>;
-}
-
-export interface Edge {
-    id: string;
-    source: string;
-    target: string;
-    type: 'position';
-    properties: Record<string, unknown>;
-}
-
-export interface GraphData {
-    nodes: Node[];
-    edges: Edge[];
-}
-
-const emptyGraphData: GraphData = {
-    nodes: [],
-    edges: []
-};
 
 const convertApiGraphData = (data: ApiGraphData): GraphData => {
     return {

@@ -26,6 +26,25 @@ import { BASE_PATH, COLLECTION_FORMATS, BaseAPI, RequiredError, operationServerM
 /**
  * 
  * @export
+ * @interface Connection
+ */
+export interface Connection {
+    /**
+     * 
+     * @type {string}
+     * @memberof Connection
+     */
+    'sourceId'?: string;
+    /**
+     * 
+     * @type {string}
+     * @memberof Connection
+     */
+    'targetId'?: string;
+}
+/**
+ * 
+ * @export
  * @interface ConnectionInput
  */
 export interface ConnectionInput {
@@ -41,6 +60,37 @@ export interface ConnectionInput {
      * @memberof ConnectionInput
      */
     'location2Id'?: string;
+}
+/**
+ * 
+ * @export
+ * @interface ConnectionResponse
+ */
+export interface ConnectionResponse {
+    /**
+     * 
+     * @type {string}
+     * @memberof ConnectionResponse
+     */
+    'sourceId'?: string;
+    /**
+     * 
+     * @type {string}
+     * @memberof ConnectionResponse
+     */
+    'targetId'?: string;
+    /**
+     * 
+     * @type {string}
+     * @memberof ConnectionResponse
+     */
+    'type'?: string;
+    /**
+     * 
+     * @type {{ [key: string]: object; }}
+     * @memberof ConnectionResponse
+     */
+    'properties'?: { [key: string]: object; };
 }
 /**
  * 
@@ -64,58 +114,21 @@ export interface CreateConnection {
 /**
  * 
  * @export
- * @interface Edge
- */
-export interface Edge {
-    /**
-     * 
-     * @type {string}
-     * @memberof Edge
-     */
-    'id'?: string;
-    /**
-     * 
-     * @type {string}
-     * @memberof Edge
-     */
-    'source'?: string;
-    /**
-     * 
-     * @type {string}
-     * @memberof Edge
-     */
-    'target'?: string;
-    /**
-     * 
-     * @type {string}
-     * @memberof Edge
-     */
-    'type'?: string;
-    /**
-     * 
-     * @type {{ [key: string]: object; }}
-     * @memberof Edge
-     */
-    'properties'?: { [key: string]: object; };
-}
-/**
- * 
- * @export
  * @interface GraphData
  */
 export interface GraphData {
     /**
      * 
-     * @type {Array<LocationData>}
+     * @type {Array<LocationResponse>}
      * @memberof GraphData
      */
-    'locations'?: Array<LocationData>;
+    'locations'?: Array<LocationResponse>;
     /**
      * 
-     * @type {Array<Edge>}
+     * @type {Array<ConnectionResponse>}
      * @memberof GraphData
      */
-    'edges'?: Array<Edge>;
+    'connections'?: Array<ConnectionResponse>;
 }
 /**
  * 
@@ -157,25 +170,6 @@ export interface Item {
 /**
  * 
  * @export
- * @interface ItemData
- */
-export interface ItemData {
-    /**
-     * 
-     * @type {string}
-     * @memberof ItemData
-     */
-    'itemId'?: string;
-    /**
-     * 
-     * @type {{ [key: string]: object; }}
-     * @memberof ItemData
-     */
-    'itemProperties'?: { [key: string]: object; };
-}
-/**
- * 
- * @export
  * @interface ItemInput
  */
 export interface ItemInput {
@@ -207,6 +201,43 @@ export interface ItemInput {
      * 
      * @type {{ [key: string]: object; }}
      * @memberof ItemInput
+     */
+    'properties'?: { [key: string]: object; };
+}
+/**
+ * 
+ * @export
+ * @interface ItemResponse
+ */
+export interface ItemResponse {
+    /**
+     * 
+     * @type {string}
+     * @memberof ItemResponse
+     */
+    'id'?: string;
+    /**
+     * 
+     * @type {string}
+     * @memberof ItemResponse
+     */
+    'name'?: string;
+    /**
+     * 
+     * @type {number}
+     * @memberof ItemResponse
+     */
+    'speed'?: number;
+    /**
+     * 
+     * @type {boolean}
+     * @memberof ItemResponse
+     */
+    'active'?: boolean;
+    /**
+     * 
+     * @type {{ [key: string]: object; }}
+     * @memberof ItemResponse
      */
     'properties'?: { [key: string]: object; };
 }
@@ -270,31 +301,18 @@ export interface Location {
      * @memberof Location
      */
     'properties'?: { [key: string]: object; };
-}
-/**
- * 
- * @export
- * @interface LocationData
- */
-export interface LocationData {
     /**
      * 
-     * @type {string}
-     * @memberof LocationData
+     * @type {Array<Item>}
+     * @memberof Location
      */
-    'locationId'?: string;
+    'items'?: Array<Item>;
     /**
      * 
-     * @type {{ [key: string]: object; }}
-     * @memberof LocationData
+     * @type {Array<Connection>}
+     * @memberof Location
      */
-    'locationProperties'?: { [key: string]: object; };
-    /**
-     * 
-     * @type {Array<ItemData>}
-     * @memberof LocationData
-     */
-    'items'?: Array<ItemData>;
+    'connections'?: Array<Connection>;
 }
 /**
  * 
@@ -356,6 +374,79 @@ export interface LocationInput {
      * @memberof LocationInput
      */
     'properties'?: { [key: string]: object; };
+}
+/**
+ * 
+ * @export
+ * @interface LocationResponse
+ */
+export interface LocationResponse {
+    /**
+     * 
+     * @type {string}
+     * @memberof LocationResponse
+     */
+    'id'?: string;
+    /**
+     * 
+     * @type {string}
+     * @memberof LocationResponse
+     */
+    'name'?: string;
+    /**
+     * 
+     * @type {number}
+     * @memberof LocationResponse
+     */
+    'latitude'?: number;
+    /**
+     * 
+     * @type {number}
+     * @memberof LocationResponse
+     */
+    'longitude'?: number;
+    /**
+     * 
+     * @type {number}
+     * @memberof LocationResponse
+     */
+    'length'?: number;
+    /**
+     * 
+     * @type {number}
+     * @memberof LocationResponse
+     */
+    'speed'?: number;
+    /**
+     * 
+     * @type {string}
+     * @memberof LocationResponse
+     */
+    'type'?: string;
+    /**
+     * 
+     * @type {boolean}
+     * @memberof LocationResponse
+     */
+    'active'?: boolean;
+    /**
+     * 
+     * @type {{ [key: string]: object; }}
+     * @memberof LocationResponse
+     */
+    'properties'?: { [key: string]: object; };
+    /**
+     * 
+     * @type {Array<ItemResponse>}
+     * @memberof LocationResponse
+     */
+    'items'?: Array<ItemResponse>;
+    /**
+     * 
+     * @type {Array<ConnectionResponse>}
+     * @memberof LocationResponse
+     */
+    'connections'?: Array<ConnectionResponse>;
 }
 /**
  * 
