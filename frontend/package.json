@@ -7,7 +7,9 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "generate-client": "openapi-generator-cli generate -i http://localhost:8080/api-docs -g typescript-axios -o src/api-client --additional-properties=supportsES6=true,npmVersion=6.9.0,typescriptThreePlus=true",
+    "predev": "npm run generate-client"
   },
   "dependencies": {
     "@react-sigma/core": "^4.0.3",
@@ -15,6 +17,8 @@
     "@react-sigma/layout-core": "^4.0.3",
     "@react-sigma/layout-forceatlas2": "^4.0.3",
     "@sigma/node-square": "^3.0.0",
+    "@stomp/stompjs": "^7.0.1",
+    "axios": "^1.6.7",
     "d": "^1.0.2",
     "graphology": "^0.25.4",
     "graphology-layout": "^0.6.1",
@@ -25,6 +29,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.11.1",
+    "@openapitools/openapi-generator-cli": "^2.9.0",
     "@types/react": "^18.3.10",
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^4.3.2",

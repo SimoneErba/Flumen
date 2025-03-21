@@ -4,29 +4,32 @@ services:
   frontend:
     build:
       context: ./frontend
+      dockerfile: Dockerfile
     container_name: frontend
     ports:
-      - "3003:80"  # React app served via Nginx
+      - "3000:80"  # React app served via Nginx
     depends_on:
       - backend
-      - orientdb
     environment:
-      - REACT_APP_API_URL=http://localhost:8000  # FastAPI backend URL
+      - VITE_API_BASE_URL=http://localhost:8080
     networks:
       - app-network
 
   backend:
     build:
       context: ./backend
+      dockerfile: Dockerfile
     container_name: backend
     ports:
-      - "8008:8008"
+      - "8080:8080"
     depends_on:
-      - orientdb
+      orientdb:
+        condition: service_healthy
     environment:
-      - ORIENTDB_HOST=orientdb
-      - ORIENTDB_PORT=2424
-      - ORIENTDB_USER=root
+      - SPRING_APPLICATION_NAME=backend
+      - SPRING_PROFILES_ACTIVE=docker
+      - ORIENTDB_URL=remote:orientdb/main
+      - ORIENTDB_USERNAME=root
       - ORIENTDB_PASSWORD=rootpwd
     networks:
       - app-network
@@ -36,12 +39,23 @@ services:
     container_name: orientdb
     environment:
       ORIENTDB_ROOT_PASSWORD: rootpwd
-      ORIENTDB_PORT: 2424
+      ORIENTDB_OPTS_MEMORY: "-Xms512m -Xmx512m"
+      ORIENTDB_NETWORK_HOST: "0.0.0.0"
     ports:
       - "2424:2424"
       - "2480:2480"  # OrientDB Studio web interface
     volumes:
+      - ./orientdb/entrypoint.sh:/orientdb/entrypoint.sh
       - orientdb-data:/orientdb/databases
+      - orientdb-config:/orientdb/config
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:2480"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    entrypoint: ["/orientdb/entrypoint.sh"]
+    restart: always
     networks:
       - app-network
 
@@ -51,4 +65,5 @@ networks:
 
 volumes:
   orientdb-data:
+  orientdb-config:
 

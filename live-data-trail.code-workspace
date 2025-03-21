@@ -14,6 +14,8 @@
       "source.fixAll": "explicit"
     },
     "files.autoSave": "afterDelay",
-    "files.autoSaveDelay": 1000
+    "files.autoSaveDelay": 1000,
+    "java.compile.nullAnalysis.mode": "disabled",
+    "vscode-as-git-mergetool.settingsAssistantOnStartup": false
   }
 }

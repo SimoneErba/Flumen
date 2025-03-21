@@ -12,5 +12,7 @@ import lombok.NoArgsConstructor;
 public class Item {
     private String id;
     private String name;
+    private Double speed;
+    private Boolean active; 
     private Map<String, Object> properties;
 }

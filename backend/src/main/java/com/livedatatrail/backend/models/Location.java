@@ -1,5 +1,7 @@
 package com.livedatatrail.backend.models;
 
+import java.util.Map;
+
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -10,6 +12,11 @@ import lombok.NoArgsConstructor;
 public class Location {
     private String id;
     private String name;
-    private double latitude;
-    private double longitude;
+    private Double latitude;
+    private Double longitude;
+    private Double length;
+    private Double speed;
+    private String type;
+    private Boolean active;
+    private Map<String, Object> properties;
 }

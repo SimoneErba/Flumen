@@ -1,13 +1,16 @@
 import './App.css'
 import { DisplayGraph } from './components/graph'
+import { useGraph } from './hooks/useGraph';
 
 function App() {
+  const { graphData, loading } = useGraph();
   return (
-    <div style={{
+    loading ? <div>Loading...</div> : <div style={{
       width: '100vw',
       height: '100vh'
     }}>
-      <DisplayGraph />
+      
+      <DisplayGraph initialGraphData={graphData} />
     </div>
   );
 }

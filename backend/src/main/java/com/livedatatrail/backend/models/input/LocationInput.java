@@ -12,7 +12,11 @@ import lombok.NoArgsConstructor;
 public class LocationInput {
 	private String id;
 	private String name;
-	private double latitude;
-	private double longitude;
+	private Double latitude;
+	private Double longitude;
+	private Double length;
+    private Double speed;
+    private String type;
+    private Boolean active;
 	private Map<String, Object> properties;
 }

@@ -49,8 +49,7 @@ public class LocationService {
 
     public Location getLocationById(String id) {
         try (ODatabaseSession db = orientDBService.getSession()) {
-            ORID theRid = new ORecordId(id);
-            OVertex vertex = db.load(theRid);
+            var vertex = OrientDBUtils.loadAndValidateVertexByCustomId(db, id);
             Location location = vertexToLocation(vertex);
             return location;
         } catch (Exception e) {
@@ -68,6 +67,10 @@ public class LocationService {
             vertex.setProperty("customId", location.getId());
             vertex.setProperty("latitude", location.getLatitude());
             vertex.setProperty("longitude", location.getLongitude());
+            vertex.setProperty("length", location.getLength());
+            vertex.setProperty("speed", location.getSpeed());
+            vertex.setProperty("type", location.getType());
+            vertex.setProperty("active", location.getActive());
             vertex.save();
             return vertexToLocation(vertex);
         } catch (Exception e) {
@@ -98,7 +101,16 @@ public class LocationService {
         if (vertex == null) {
             throw new IllegalArgumentException("Attempted to convert a null vertex to location.");
         }
-        return new Location(vertex.getIdentity().toString(), vertex.getProperty("name"), vertex.getProperty("latitude"),
-                vertex.getProperty("longitude"));
+        return new Location(
+            vertex.getIdentity().toString(),
+            vertex.getProperty("name"),
+            vertex.getProperty("latitude"),
+            vertex.getProperty("longitude"),
+            vertex.getProperty("length"),
+            vertex.getProperty("speed"),
+            vertex.getProperty("type"),
+            vertex.getProperty("active"),
+            vertex.getProperty("properties")
+        );
     }
 }

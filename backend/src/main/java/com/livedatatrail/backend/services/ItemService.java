@@ -62,6 +62,8 @@ public class ItemService {
             OVertex vertex = db.newVertex("Item");
             vertex.setProperty("customId", item.getId());
             vertex.setProperty("name", item.getName());
+            vertex.setProperty("speed", item.getSpeed());
+            vertex.setProperty("active", item.getActive());
             vertex.setProperty("properties", item.getProperties());
             vertex.save();
             return vertexToItem(vertex);
@@ -90,7 +92,12 @@ public class ItemService {
     }
 
     private Item vertexToItem(OVertex vertex) {
-        return new Item(vertex.getProperty("customId").toString(), vertex.getProperty("name"),
-                vertex.getProperty("properties"));
+        return new Item(
+            vertex.getIdentity().toString(),
+            vertex.getProperty("name"),
+            vertex.getProperty("speed"),
+            vertex.getProperty("active"),
+            vertex.getProperty("properties")
+        );
     }
 }
