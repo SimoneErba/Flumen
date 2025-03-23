@@ -1,4 +1,4 @@
-package com.livedatatrail.backend.models;
+package com.livedatatrail.backend.models.entity;
 
 import java.util.Map;
 import java.util.List;
@@ -20,4 +20,6 @@ public class Location {
     private String type;
     private Boolean active;
     private Map<String, Object> properties;
-}
+    private List<Item> items;
+    private List<Connection> connections;
+} 

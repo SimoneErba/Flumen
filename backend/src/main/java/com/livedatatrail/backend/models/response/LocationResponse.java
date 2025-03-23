@@ -1,4 +1,4 @@
-package com.livedatatrail.backend.models;
+package com.livedatatrail.backend.models.response;
 
 import java.util.Map;
 import java.util.List;
@@ -10,7 +10,7 @@ import lombok.NoArgsConstructor;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class Location {
+public class LocationResponse {
     private String id;
     private String name;
     private Double latitude;
@@ -20,4 +20,6 @@ public class Location {
     private String type;
     private Boolean active;
     private Map<String, Object> properties;
-}
+    private List<ItemResponse> items;
+    private List<ConnectionResponse> connections;
+} 

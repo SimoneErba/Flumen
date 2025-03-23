@@ -54,6 +54,11 @@ public class OrientDBService {
                 session.createEdgeClass("HasPosition");
                 logger.info("Created edge class: HasPosition");
             }
+
+            if (session.getClass("ConnectedTo") == null) {
+                session.createEdgeClass("ConnectedTo");
+                logger.info("Created edge class: ConnectedTo");
+            }
         });
     }
 
