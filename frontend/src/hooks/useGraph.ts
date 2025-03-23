@@ -1,24 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useApi } from './useApi';
 import { useWebSocket, PositionUpdate, NodeUpdate } from './useWebSocket';
-import { GraphData as ApiGraphData, GraphData } from '../api-client';
+import { GraphData, Location, Item } from '../types/api';
 
-
-const convertApiGraphData = (data: ApiGraphData): GraphData => {
-    return {
-        nodes: data.nodes?.map(node => ({
-            id: node.id || '',
-            type: (node.type as 'item' | 'location') || 'item',
-            properties: node.properties || {}
-        })) || [],
-        edges: data.edges?.map(edge => ({
-            id: edge.id || '',
-            source: edge.source || '',
-            target: edge.target || '',
-            type: 'position',
-            properties: edge.properties || {}
-        })) || []
-    };
+const emptyGraphData: GraphData = {
+    locations: [],
+    connections: []
 };
 
 export const useGraph = () => {
@@ -34,11 +21,16 @@ export const useGraph = () => {
             try {
                 setLoading(true);
                 const response = await graphApi.getGraphData();
-                setGraphData(convertApiGraphData(response.data));
-                setError(null);
+                if (response?.data) {
+                    setGraphData(response.data);
+                    setError(null);
+                } else {
+                    throw new Error('Invalid response data');
+                }
             } catch (err) {
                 setError('Failed to fetch graph data');
                 console.error('Error fetching graph data:', err);
+                setGraphData(emptyGraphData);
             } finally {
                 setLoading(false);
             }
@@ -52,24 +44,41 @@ export const useGraph = () => {
         if (!connected) return;
 
         const handlePositionUpdate = (update: PositionUpdate) => {
-            setGraphData(current => {
-                const newEdges = current.edges.filter(edge => 
-                    edge.source !== update.itemId
-                );
+            setGraphData((current: GraphData) => {
+                // Find the old location of the item
+                const updatedLocations = current.locations.map((location: Location) => {
+                    const updatedItems = (location.items || []).filter((item: Item) => 
+                        item.id !== update.itemId
+                    );
+                    return {
+                        ...location,
+                        items: updatedItems
+                    };
+                });
 
+                // Add item to new location
                 if (update.locationId) {
-                    newEdges.push({
-                        id: `${update.itemId}-${update.locationId}`,
-                        source: update.itemId,
-                        target: update.locationId,
-                        type: 'position',
-                        properties: {}
-                    });
+                    const newLocation = updatedLocations.find(loc => loc.id === update.locationId);
+                    if (newLocation) {
+                        const item = current.locations
+                            .flatMap(loc => loc.items || [])
+                            .find(item => item.id === update.itemId);
+                        
+                        if (item) {
+                            const locationIndex = updatedLocations.findIndex(loc => loc.id === update.locationId);
+                            if (locationIndex !== -1) {
+                                updatedLocations[locationIndex] = {
+                                    ...newLocation,
+                                    items: [...(newLocation.items || []), item]
+                                };
+                            }
+                        }
+                    }
                 }
 
                 return {
                     ...current,
-                    edges: newEdges
+                    locations: updatedLocations
                 };
             });
         };
@@ -83,16 +92,33 @@ export const useGraph = () => {
         if (!connected) return;
 
         const handleNodeUpdate = (update: NodeUpdate) => {
-            setGraphData(current => {
-                const newNodes = current.nodes.map(node =>
-                    node.id === update.id
-                        ? { ...node, properties: { ...node.properties, ...update.properties } }
-                        : node
+            setGraphData((current: GraphData) => {
+                // Update location properties
+                const updatedLocations = current.locations.map((location: Location) =>
+                    location.id === update.id
+                        ? { ...location, ...update.properties }
+                        : location
                 );
+
+                // Update item properties
+                const locationsWithUpdatedItems = updatedLocations.map((location: Location) => {
+                    if (!location.items) return location;
+
+                    const updatedItems = location.items.map((item: Item) =>
+                        item.id === update.id
+                            ? { ...item, ...update.properties }
+                            : item
+                    );
+
+                    return {
+                        ...location,
+                        items: updatedItems
+                    };
+                });
 
                 return {
                     ...current,
-                    nodes: newNodes
+                    locations: locationsWithUpdatedItems
                 };
             });
         };

@@ -11,8 +11,8 @@ import {
 import { MultiDirectedGraph } from "graphology";
 import { NodeSquareProgram } from "@sigma/node-square";
 import "@react-sigma/core/lib/react-sigma.min.css";
-import { GraphData } from "../hooks/useGraph";
 import { hashToNumber } from "../utils/hash";
+import { GraphData } from "../api-client";
 
 const sigmaStyle = { height: "100vh", width: "100vw" };
 
@@ -31,54 +31,64 @@ const LoadGraph = ({initialGraphData}: LoadGraphProps) => {
   });
 
   useEffect(() => {
-    setGraphData({
-      nodes: initialGraphData.nodes.map(node => ({
-        id: node.id,
-        x: node.properties?.x ?? hashToNumber(node.id),
-        y: node.properties?.y ?? hashToNumber(node.id + "random"),
-        type: node.type,
+    // Transform locations and items into nodes
+    const nodes = [
+      // Add locations as nodes
+      ...initialGraphData.locations.map(location => ({
+        id: location.id,
+        x: location.longitude ?? hashToNumber(location.id),
+        y: location.latitude ?? hashToNumber(location.id + "random"),
+        type: "location",
+        label: location.name,
+        properties: location.properties || {}
       })),
-      edges: initialGraphData.edges.map(edge => ({
-        source: edge.source,
-        target: edge.target,
-      })),
-    });
-  }, [initialGraphData]); 
-    
+      // Add items as nodes
+      ...initialGraphData.locations.flatMap(location => 
+        (location.items || []).map(item => ({
+          id: item.id,
+          x: location.longitude ?? hashToNumber(location.id),
+          y: location.latitude ?? hashToNumber(location.id + "random"),
+          type: "item",
+          label: item.name,
+          properties: item.properties || {}
+        }))
+      )
+    ];
+
+    // Transform connections into edges
+    const edges = initialGraphData.connections.map(connection => ({
+      source: connection.sourceId,
+      target: connection.targetId
+    }));
+
+    setGraphData({ nodes, edges });
+  }, [initialGraphData]);
+
   useEffect(() => {
     const graph = new MultiDirectedGraph();
-    graphData.nodes.filter(x => x.type === "location").forEach(({ id, x, y }) => {
-        graph.addNode(id, {
-          label: `Node ${id}`,
-          x,
-          y,
-          size: 10,
-          fixed: true,
-        });
+
+    // Add location nodes
+    graphData.nodes.filter(x => x.type === "location").forEach(({ id, x, y, label }) => {
+      graph.addNode(id, {
+        label: label || `Location ${id}`,
+        x,
+        y,
+        size: 10,
+        color: "#69b3a2",
+        fixed: true,
+      });
     });
 
-    graphData.edges.filter(x => x.type === "connected_to").forEach((edge) => {
+    // Add connections between locations
+    graphData.edges.forEach((edge) => {
+      if (!graph.hasNode(edge.source) || !graph.hasNode(edge.target)) return;
       graph.addEdge(edge.source, edge.target);
     });
-    const locationCoords = {};
 
-    graphData.nodes
-    .filter((node) => node.type === "item")
-    .forEach(({ id }) => {
-      // Find the location this item is connected to
-      const edge = graphData.edges.find(
-        (e) => e.type === "connected_to" && e.source === id
-      );
-  
-      if (!edge || !locationCoords[edge.target]) {
-        console.warn(`No location found for item ${id}`);
-        return; // Skip if no connected location
-      }
-  
-      const { x, y } = locationCoords[edge.target];
-  
+    // Add item nodes
+    graphData.nodes.filter(x => x.type === "item").forEach(({ id, x, y, label }) => {
       graph.addNode(id, {
-        label: `Node ${id}`,
+        label: label || `Item ${id}`,
         x,
         y,
         size: 8,
@@ -133,6 +143,7 @@ const LoadGraph = ({initialGraphData}: LoadGraphProps) => {
       x,
       y,
       size: 10,
+      type: "location",
       fixed: true,
     };
 
@@ -153,6 +164,7 @@ const LoadGraph = ({initialGraphData}: LoadGraphProps) => {
         ...closestNodes.map((e) => ({
           source: newNodeId,
           target: e.nodeId,
+          type: "out"
         })),
       ],
     }));
