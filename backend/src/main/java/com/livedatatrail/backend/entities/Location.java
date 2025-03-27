@@ -1,4 +1,4 @@
-package com.livedatatrail.backend.models.entity;
+package com.livedatatrail.backend.entities;
 
 import java.util.Map;
 
@@ -9,10 +9,9 @@ import lombok.NoArgsConstructor;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class Item {
+public class Location {
     private String id;
     private String name;
-    private Double speed;
-    private Boolean active; 
+    private Boolean active;
     private Map<String, Object> properties;
 } 

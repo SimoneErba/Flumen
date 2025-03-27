@@ -1,4 +1,4 @@
-package com.livedatatrail.backend.models.entity;
+package com.livedatatrail.backend.entities;
 
 import java.util.Map;
 
@@ -9,9 +9,9 @@ import lombok.NoArgsConstructor;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class Connection {
+public class ConnectedTo {
     private String sourceId;
     private String targetId;
-    private String type;  // Direction: "in" or "out"
+    private String direction;  // Direction: "in" or "out"
     private Map<String, Object> properties;
 } 

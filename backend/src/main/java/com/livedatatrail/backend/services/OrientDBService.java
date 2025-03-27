@@ -4,11 +4,14 @@ import com.orientechnologies.orient.core.db.ODatabasePool;
 import com.orientechnologies.orient.core.db.ODatabaseSession;
 import com.orientechnologies.orient.core.db.OrientDB;
 import com.orientechnologies.orient.core.db.OrientDBConfig;
+import com.livedatatrail.backend.entities.Location;
 import com.orientechnologies.orient.core.config.OGlobalConfiguration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+
+import java.util.Arrays;
 
 import javax.annotation.PostConstruct;
 import javax.annotation.PreDestroy;
@@ -49,6 +52,22 @@ public class OrientDBService {
             if (session.getClass("Item") == null) {
                 session.createVertexClass("Item");
                 logger.info("Created vertex class: Item");
+            }
+            if (session.getClass("GeoLocation") == null) {
+                session.createVertexClass("GeoLocation").setSuperClasses(Arrays.asList(session.getClass("Location")));
+                logger.info("Created vertex class: GeoLocation");
+            }
+            if (session.getClass("MovingItem") == null) {
+                session.createVertexClass("MovingItem").setSuperClasses(Arrays.asList(session.getClass("Item")));
+                logger.info("Created vertex class: MovingItem");
+            }
+            if (session.getClass("Road") == null) {
+                session.createVertexClass("Road").setSuperClasses(Arrays.asList(session.getClass("Location")));
+                logger.info("Created vertex class: Road");
+            }
+            if (session.getClass("Conveyor") == null) {
+                session.createVertexClass("Conveyor").setSuperClasses(Arrays.asList(session.getClass("Road")));
+                logger.info("Created vertex class: Conveyor");
             }
             if (session.getClass("HasPosition") == null) {
                 session.createEdgeClass("HasPosition");

@@ -13,10 +13,10 @@ import org.springframework.stereotype.Service;
 import java.util.*;
 import java.util.stream.Collectors;
 
-import com.livedatatrail.backend.models.entity.Location;
+import com.livedatatrail.backend.entities.ConnectedTo;
+import com.livedatatrail.backend.entities.Item;
+import com.livedatatrail.backend.entities.Location;
 import com.livedatatrail.backend.models.graph.GraphData;
-import com.livedatatrail.backend.models.entity.Item;
-import com.livedatatrail.backend.models.entity.Connection;
 import com.livedatatrail.backend.models.response.LocationResponse;
 import com.livedatatrail.backend.models.response.ItemResponse;
 import com.livedatatrail.backend.models.response.ConnectionResponse;
@@ -34,7 +34,7 @@ public class GraphService {
         // Configure custom mappings if needed
         modelMapper.createTypeMap(Location.class, LocationResponse.class);
         modelMapper.createTypeMap(Item.class, ItemResponse.class);
-        modelMapper.createTypeMap(Connection.class, ConnectionResponse.class);
+        modelMapper.createTypeMap(ConnectedTo.class, ConnectionResponse.class);
     }
 
     public GraphData getGraphData() {
@@ -54,7 +54,7 @@ public class GraphService {
                     location.setLongitude(result.getProperty("longitude"));
                     location.setLength(result.getProperty("length"));
                     location.setSpeed(result.getProperty("speed"));
-                    location.setType(result.getProperty("type"));
+                    location.setDirection(result.getProperty("type"));
                     location.setActive(result.getProperty("active"));
                     
                     location.setProperties(result.getProperty("properties"));
@@ -76,16 +76,16 @@ public class GraphService {
                         location.setItems(locationItems);
                     }
                     
-                    List<Connection> locationConnections = new ArrayList<>();
+                    List<ConnectedTo> locationConnections = new ArrayList<>();
                     
                     // Process outgoing connections
                     List<ODocument> outResults = result.getProperty("out");
                     if (outResults != null) {
                         outResults.forEach(outResult -> {
-                            Connection conn = new Connection();
+                            ConnectedTo conn = new ConnectedTo();
                             conn.setSourceId(location.getId());
                             conn.setTargetId(outResult.field("@rid").toString());
-                            conn.setType("out");
+                            conn.setDirection("out");
                         
                             conn.setProperties(outResult.field("properties"));
   
@@ -97,10 +97,10 @@ public class GraphService {
                     List<ODocument> inResults = result.getProperty("in");
                     if (inResults != null) {
                         inResults.forEach(inResult -> {
-                            Connection conn = new Connection();
+                            ConnectedTo conn = new ConnectedTo();
                             conn.setSourceId(inResult.field("@rid").toString());
                             conn.setTargetId(location.getId());
-                            conn.setType("in");
+                            conn.setDirection("in");
 
                             conn.setProperties(inResult.field("properties"));
                             locationConnections.add(conn);
@@ -125,7 +125,7 @@ public class GraphService {
         // Collect all connections and convert using ModelMapper
         List<ConnectionResponse> allConnections = locations.stream()
             .flatMap(location -> location.getConnections().stream())
-            .filter(connection -> connection.getType().equals("in"))
+            .filter(connection -> connection.getDirection().equals("in"))
             .map(connection -> {
                 ConnectionResponse response = modelMapper.map(connection, ConnectionResponse.class);
                 // Ensure IDs are properly set and not Optional.empty
