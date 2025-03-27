@@ -1,0 +1,47 @@
+<clickhouse>
+    <asynchronous_metric_log remove="1"/>
+
+    <query_log replace="replace">
+        <database>system</database>
+        <table>query_log</table>
+        <engine>Engine = MergeTree PARTITION BY event_date ORDER BY event_time
+            TTL event_date + INTERVAL 20 DAY,
+            event_date + INTERVAL 1 SECOND WHERE query = 'SELECT 1 FORMAT TabSeparated'</engine>
+    </query_log>
+
+    <trace_log replace="replace">
+        <database>system</database>
+        <table>trace_log</table>
+        <engine>Engine = MergeTree PARTITION BY event_date ORDER BY event_time TTL event_date + INTERVAL 7 DAY</engine>
+    </trace_log>
+
+    <processors_profile_log remove="1"/>
+
+    <text_log replace="replace">
+        <level>information</level>
+        <database>system</database>
+        <table>text_log</table>
+        <engine>Engine = MergeTree PARTITION BY event_date ORDER BY event_time TTL event_date + INTERVAL 7 DAY</engine>
+    </text_log>
+
+    <part_log replace="replace">
+        <database>system</database>
+        <table>part_log</table>
+        <engine>Engine = MergeTree PARTITION BY event_date ORDER BY event_time TTL event_date + INTERVAL 7 DAY</engine>
+    </part_log>
+
+    <metric_log replace="replace">
+        <database>system</database>
+        <table>metric_log</table>
+        <engine>Engine = MergeTree PARTITION BY event_date ORDER BY event_time TTL event_date + INTERVAL 20 DAY</engine>
+    </metric_log>
+
+    <prometheus>
+        <port>9363</port>
+        <endpoint>/metrics</endpoint>
+        <metrics>true</metrics>
+        <asynchronous_metrics>true</asynchronous_metrics>
+        <events>true</events>
+        <errors>true</errors>
+    </prometheus>
+</clickhouse>
