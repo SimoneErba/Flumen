@@ -1,6 +1,6 @@
 package com.livedatatrail.backend.services;
 
-import com.livedatatrail.backend.models.Location;
+import com.livedatatrail.backend.domain.Location;
 import com.livedatatrail.backend.models.UpdateModel;
 import com.livedatatrail.backend.models.input.LocationInput;
 import com.livedatatrail.backend.utils.OrientDBUtils;
@@ -15,6 +15,8 @@ import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.List;
+
+import com.livedatatrail.backend.domain.events.DomainEvent;
 
 @Service
 public class LocationService {
@@ -57,7 +59,7 @@ public class LocationService {
         }
     }
 
-    public Location createLocation(LocationInput location) {
+    public Location createLocation(Location location) {
         try (ODatabaseSession db = orientDBService.getSession()) {
             if (OrientDBUtils.checkIfAlreadyExists(db, location.getId())) {
                 throw new IllegalArgumentException("Location with name " + location.getName() + " already exists.");

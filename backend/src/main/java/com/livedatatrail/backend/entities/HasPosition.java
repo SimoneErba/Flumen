@@ -7,11 +7,6 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-public enum HasPositionStatus {
-    MOVING,
-    STOPPED
-}
-
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
