@@ -4,6 +4,10 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rabbitmq.client.Channel;
 import com.rabbitmq.client.Connection;
 import com.rabbitmq.client.ConnectionFactory;
+import flumen.events.DomainEvent;
+import flumen.events.ItemCreatedEvent;
+import flumen.events.ItemPositionChangedEvent;
+import flumen.events.LocationCreatedEvent;
 
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -11,6 +15,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -26,18 +31,7 @@ public class App {
     private static final ObjectMapper objectMapper = new ObjectMapper();
 
     private static Channel rabbitChannel;
-        private static void setupRabbit() throws Exception {
-        ConnectionFactory factory = new ConnectionFactory();
-        factory.setHost(RABBIT_HOST);
-        Connection connection = factory.newConnection();
-        rabbitChannel = connection.createChannel();
-        rabbitChannel.queueDeclare(RABBIT_QUEUE, false, false, false, null);
-    }
-    private static void sendEventToRabbit(Object event) throws Exception {
-        String json = objectMapper.writeValueAsString(event);
-        rabbitChannel.basicPublish("", RABBIT_QUEUE, null, json.getBytes());
-        logger.info(() -> "Sent event to RabbitMQ: " + json);
-    }
+
     public static void main(String[] args) {
         try {
             if (MODE.equalsIgnoreCase("rabbit")) {
@@ -49,22 +43,22 @@ public class App {
             // Step 1: Create 1000 Items
             for (int i = 1; i <= 10; i++) {
                 String itemName = "Item" + i;
-                //createItem(itemName);
+                sendEvent(new ItemCreatedEvent(itemName, itemName, 1.0, true, new HashMap<>()), "POST");
                 items.add(itemName);
             }
 
             // Step 2: Create 1000 Locations
             for (int i = 1; i <= 10; i++) {
                 String locationName = "Location" + i;
-                createLocation(locationName);
+                sendEvent(new LocationCreatedEvent(locationName, locationName, true, 0.0, 0.0, 10.0, 1.0, "conveyor", new HashMap<>()), "POST");
                 locations.add(locationName);
             }
-            
+
             // Step 3: Establish Initial Connections
             for (int i = 0; i < items.size(); i++) {
                 String item = items.get(i);
                 String location = locations.get(i % locations.size()); // Distribute items across locations
-                createConnection(item, location);
+                sendEvent(new ItemPositionChangedEvent(item, location), "POST");
             }
 
             // Step 4: Create Connections Between Locations
@@ -81,7 +75,7 @@ public class App {
                 for (int i = 0; i < items.size(); i++) {
                     String item = items.get(i);
                     String newLocation = locations.get(i);
-                    moveConnection(item, newLocation);
+                    sendEvent(new ItemPositionChangedEvent(item, newLocation), "PUT");
                 }
 
                 // Optional: Add a delay to avoid overwhelming the server
@@ -92,86 +86,60 @@ public class App {
         }
     }
 
-    private static void createItem(String itemName) throws Exception {
-        logger.info(() -> "Creating item " + itemName);
+    private static void setupRabbit() throws Exception {
+        ConnectionFactory factory = new ConnectionFactory();
+        factory.setHost(RABBIT_HOST);
+        Connection connection = factory.newConnection();
+        rabbitChannel = connection.createChannel();
+        rabbitChannel.queueDeclare(RABBIT_QUEUE, false, false, false, null);
+    }
 
-        // First check if the item exists
-        HttpRequest checkRequest = HttpRequest.newBuilder()
-                .uri(new URI(BASE_URL + "/items/" + itemName))
-                .GET()
-                .build();
-
-        HttpResponse<String> checkResponse = httpClient.send(checkRequest, HttpResponse.BodyHandlers.ofString());
-        if (checkResponse.statusCode() == 200) {
-            logger.info(() -> "Item " + itemName + " already exists, skipping creation.");
-            return;
-        }
-
-        // Create the item if it doesn't exist
-        HttpRequest request = HttpRequest.newBuilder()
-                .uri(new URI(BASE_URL + "/items"))
-                .header("Content-Type", "application/json")
-                .POST(HttpRequest.BodyPublishers
-                        .ofString(String.format("{\"id\":\"%s\", \"name\":\"%s\", \"speed\":1.0, \"active\":true}", itemName, itemName)))
-                .build();
-
-        HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-        if (response.statusCode() == 200) {
-            logger.info(() -> "Item " + itemName + " created successfully.");
+    private static void sendEvent(DomainEvent event, String httpMethod) throws Exception {
+        String json = objectMapper.writeValueAsString(event);
+        if (MODE.equalsIgnoreCase("rabbit")) {
+            rabbitChannel.basicPublish("", RABBIT_QUEUE, null, json.getBytes());
+            logger.info(() -> "Sent event to RabbitMQ: " + json);
         } else {
-            logger.warning(() -> "Failed to create item " + itemName + ": " + response.body());
+            String endpoint = getEndpointForEvent(event);
+            if (endpoint == null) {
+                logger.warning(() -> "Unknown event type: " + event.getClass().getName());
+                return;
+            }
+
+            HttpRequest.Builder requestBuilder = HttpRequest.newBuilder()
+                    .uri(new URI(BASE_URL + endpoint))
+                    .header("Content-Type", "application/json");
+
+            HttpRequest.BodyPublisher bodyPublisher = HttpRequest.BodyPublishers.ofString(json);
+
+            if ("POST".equalsIgnoreCase(httpMethod)) {
+                requestBuilder.POST(bodyPublisher);
+            } else if ("PUT".equalsIgnoreCase(httpMethod)) {
+                requestBuilder.PUT(bodyPublisher);
+            } else {
+                logger.warning("Unsupported HTTP method: " + httpMethod);
+                return;
+            }
+
+            HttpRequest request = requestBuilder.build();
+            HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+            if (response.statusCode() == 200) {
+                logger.info(() -> "Sent event to API: " + json);
+            } else {
+                logger.warning(() -> "Failed to send event to API: " + response.body());
+            }
         }
     }
 
-    private static void createLocation(String locationName) throws Exception {
-        logger.info(() -> "Creating location " + locationName);
-
-        // First check if the location exists
-        HttpRequest checkRequest = HttpRequest.newBuilder()
-                .uri(new URI(BASE_URL + "/locations/" + locationName))
-                .GET()
-                .build();
-
-        HttpResponse<String> checkResponse = httpClient.send(checkRequest, HttpResponse.BodyHandlers.ofString());
-        if (checkResponse.statusCode() == 200) {
-            logger.info(() -> "Location " + locationName + " already exists, skipping creation.");
-            return;
+    private static String getEndpointForEvent(DomainEvent event) {
+        if (event instanceof ItemCreatedEvent) {
+            return "/items";
+        } else if (event instanceof LocationCreatedEvent) {
+            return "/locations";
+        } else if (event instanceof ItemPositionChangedEvent) {
+            return "/positions";
         }
-
-        // Create the location if it doesn't exist
-        HttpRequest request = HttpRequest.newBuilder()
-                .uri(new URI(BASE_URL + "/locations"))
-                .header("Content-Type", "application/json")
-                .POST(HttpRequest.BodyPublishers
-                        .ofString(String.format("{\"id\":\"%s\",\"name\":\"%s\",\"latitude\":0.0,\"longitude\":0.0,\"length\":10.0,\"speed\":1.0,\"type\":\"conveyor\",\"active\":true}", 
-                                locationName, locationName)))
-                .build();
-
-        HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-        if (response.statusCode() == 200) {
-            logger.info(() -> "Location " + locationName + " created successfully.");
-        } else {
-            logger.warning(() -> "Failed to create location " + locationName + ": " + response.body());
-        }
-    }
-
-    private static void createConnection(String itemId, String locationId) throws Exception {
-        logger.info(() -> String.format("Creating connection between item %s and location %s", itemId, locationId));
-
-        String requestBody = String.format("{\"itemId\":\"%s\",\"locationId\":\"%s\"}", itemId, locationId);
-
-        HttpRequest request = HttpRequest.newBuilder()
-                .uri(new URI(BASE_URL + "/positions"))
-                .header("Content-Type", "application/json")
-                .POST(HttpRequest.BodyPublishers.ofString(requestBody))
-                .build();
-
-        HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-        if (response.statusCode() == 200) {
-            logger.info("Connection created successfully.");
-        } else {
-            logger.warning(() -> "Failed to create connection: " + response.body());
-        }
+        return null;
     }
 
     private static void createLocationConnection(String locationId1, String locationId2) throws Exception {
@@ -190,25 +158,6 @@ public class App {
             logger.info("Location connection created successfully.");
         } else {
             logger.warning(() -> "Failed to create location connection: " + response.body());
-        }
-    }
-
-    private static void moveConnection(String itemId, String newLocationId) throws Exception {
-        logger.info(() -> String.format("Moving item %s to new location %s.", itemId, newLocationId));
-
-        String requestBody = String.format("{\"itemId\":\"%s\",\"locationId\":\"%s\"}", itemId, newLocationId);
-
-        HttpRequest request = HttpRequest.newBuilder()
-                .uri(new URI(BASE_URL + "/positions"))
-                .header("Content-Type", "application/json")
-                .PUT(HttpRequest.BodyPublishers.ofString(requestBody))
-                .build();
-
-        HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-        if (response.statusCode() == 200) {
-            logger.info("Item moved successfully.");
-        } else {
-            logger.warning(() -> "Failed to move item: " + response.body());
         }
     }
 }
