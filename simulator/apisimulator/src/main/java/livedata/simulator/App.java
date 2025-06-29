@@ -1,5 +1,10 @@
 package livedata.simulator;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.rabbitmq.client.Channel;
+import com.rabbitmq.client.Connection;
+import com.rabbitmq.client.ConnectionFactory;
+
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -15,9 +20,29 @@ public class App {
     private static final String BASE_URL = "http://localhost:8080/api";
     private static final HttpClient httpClient = HttpClient.newHttpClient();
     private static final Logger logger = Logger.getLogger(App.class.getName());
+    private static final String MODE = System.getenv().getOrDefault("SIMULATION_MODE", "api"); // "api" or "rabbit"
+    private static final String RABBIT_HOST = "localhost";
+    private static final String RABBIT_QUEUE = "sorting-events";
+    private static final ObjectMapper objectMapper = new ObjectMapper();
 
+    private static Channel rabbitChannel;
+        private static void setupRabbit() throws Exception {
+        ConnectionFactory factory = new ConnectionFactory();
+        factory.setHost(RABBIT_HOST);
+        Connection connection = factory.newConnection();
+        rabbitChannel = connection.createChannel();
+        rabbitChannel.queueDeclare(RABBIT_QUEUE, false, false, false, null);
+    }
+    private static void sendEventToRabbit(Object event) throws Exception {
+        String json = objectMapper.writeValueAsString(event);
+        rabbitChannel.basicPublish("", RABBIT_QUEUE, null, json.getBytes());
+        logger.info(() -> "Sent event to RabbitMQ: " + json);
+    }
     public static void main(String[] args) {
         try {
+            if (MODE.equalsIgnoreCase("rabbit")) {
+                setupRabbit();
+            }
             List<String> items = new ArrayList<>();
             List<String> locations = new ArrayList<>();
 
@@ -31,7 +56,7 @@ public class App {
             // Step 2: Create 1000 Locations
             for (int i = 1; i <= 10; i++) {
                 String locationName = "Location" + i;
-                //createLocation(locationName);
+                createLocation(locationName);
                 locations.add(locationName);
             }
             
@@ -39,7 +64,7 @@ public class App {
             for (int i = 0; i < items.size(); i++) {
                 String item = items.get(i);
                 String location = locations.get(i % locations.size()); // Distribute items across locations
-                //createConnection(item, location);
+                createConnection(item, location);
             }
 
             // Step 4: Create Connections Between Locations

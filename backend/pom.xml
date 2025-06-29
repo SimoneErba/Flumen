@@ -8,7 +8,7 @@
 		<version>3.3.5</version>
 		<relativePath/> <!-- lookup parent from repository -->
 	</parent>
-	<groupId>com.livedatatrail</groupId>
+	<groupId>com.flumen</groupId>
 	<artifactId>backend</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
 	<name>backend</name>
@@ -64,6 +64,12 @@
 			<groupId>com.orientechnologies</groupId>
 			<artifactId>orientdb-server</artifactId>
 			<version>3.2.3</version>
+			<exclusions>
+				<exclusion>
+					<groupId>org.graalvm.tools</groupId>
+					<artifactId>chromeinspector</artifactId>
+				</exclusion>
+			</exclusions>
 		</dependency>
 		<dependency>
 			<groupId>org.springdoc</groupId>
@@ -81,8 +87,8 @@
 		</dependency>
 		<dependency>
 			<groupId>com.clickhouse</groupId>
-			<artifactId>clickhouse-client</artifactId>
-			<version>0.6.0</version>
+			<artifactId>client-v2</artifactId>
+			<version>0.9.0</version>
 		</dependency>
 		<dependency>
 			<groupId>com.fasterxml.jackson.core</groupId>
@@ -91,6 +97,11 @@
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
 			<artifactId>spring-boot-starter-amqp</artifactId>
+		</dependency>
+		<dependency>
+		<groupId>flumen</groupId>
+		<artifactId>events</artifactId>
+		<version>1.0.0</version>
 		</dependency>
 	</dependencies>
 

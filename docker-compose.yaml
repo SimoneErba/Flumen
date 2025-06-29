@@ -45,7 +45,7 @@ services:
       - "2424:2424"
       - "2480:2480"  # OrientDB Studio web interface
     volumes:
-      - ./orientdb/entrypoint.sh:/orientdb/entrypoint.sh
+      - ./docker/orientdb/entrypoint.sh:/orientdb/entrypoint.sh
       - orientdb-data:/orientdb/databases
       - orientdb-config:/orientdb/config
     healthcheck:
@@ -58,6 +58,44 @@ services:
     restart: always
     networks:
       - app-network
+  clickhouse:
+    image: clickhouse/clickhouse-server:latest
+    container_name: clickhouse
+    restart: always
+    ports:
+      - "8124:8123"
+      - "9001:9000"
+    volumes:
+      - clickhouse-data:/var/lib/clickhouse
+      - ./docker/clickhouse/users.xml:/etc/clickhouse-server/users.xml
+      - ./docker/clickhouse/config.xml:/etc/clickhouse-server/config.d/config.xml
+      - ./docker/clickhouse/init-clickhouse:/docker-entrypoint-initdb.d/
+    environment:
+      CLICKHOUSE_ALWAYS_RUN_INITDB_SCRIPTS: 1
+      CLICKHOUSE_USER: default
+      CLICKHOUSE_PASSWORD: Oncode01
+    healthcheck:
+      test: wget --no-verbose --tries=1 --spider http://localhost:8124/ping || exit 1
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    
+  rabbitmq:
+    image: rabbitmq:3.12-management
+    ports:
+      - "5672:5672"   # AMQP protocol port
+      - "15672:15672" # Management UI port
+    environment:
+      - RABBITMQ_DEFAULT_USER=admin
+      - RABBITMQ_DEFAULT_PASS=admin
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmqctl", "status"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
 
 networks:
   app-network:
@@ -66,4 +104,5 @@ networks:
 volumes:
   orientdb-data:
   orientdb-config:
+  clickhouse-data:
 

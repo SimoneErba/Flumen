@@ -1,0 +1,12 @@
+flumen/events/DomainEvent.class
+flumen/events/LocationDeactivatedEvent.class
+flumen/events/LocationPropertiesUpdatedEvent.class
+flumen/events/ItemActivatedEvent.class
+flumen/events/ItemSpeedChangedEvent.class
+flumen/events/ItemPropertiesUpdatedEvent.class
+flumen/events/LocationActivatedEvent.class
+flumen/events/ItemDeactivatedEvent.class
+flumen/events/LocationCreatedEvent.class
+flumen/events/ItemCreatedEvent.class
+flumen/events/LocationDeletedEvent.class
+flumen/events/ItemPositionChangedEvent.class

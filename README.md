@@ -1,8 +1,22 @@
-# LiveDataTrail
+# Flumen
 
 The idea is that nodes move over nodes. edges are just used to indicate whats the next node, but actual connections are represented by nodes. Nodes with type "location" that can have a length and a speed. if they have length and speed, then when an item goes over them, it starts to move. (not in the backedn, only in the frontend). Then , when it reaches the end, it will move to the next location. but we wait for the external system to notify us. for us, it will stay in the old location. if a location gets inactive, it will stop moving on the frontend. if it changes type "alarm, ok", it will change color.
 
 nodes can be created in the frontend and users can change their position and attributes. clicking on an edge will update the location node. 
+
+### Models
+
+entitys are not used are just to rememebr the possible fields.
+models are used as input anbd output if the controllers
+domain have the logic
+
+### What I decided
+
+https://martinfowler.com/eaaDev/EventSourcing.html
+
+
+edges store the progress of the item in case of stops. (the length done). just a percetage with a datetime and if history is needed, evwnt sourcing
+
 
 ## Future Improvements
 
