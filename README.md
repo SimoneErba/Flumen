@@ -1,93 +1,72 @@
 # Flumen
 
-The idea is that nodes move over nodes. edges are just used to indicate whats the next node, but actual connections are represented by nodes. Nodes with type "location" that can have a length and a speed. if they have length and speed, then when an item goes over them, it starts to move. (not in the backedn, only in the frontend). Then , when it reaches the end, it will move to the next location. but we wait for the external system to notify us. for us, it will stay in the old location. if a location gets inactive, it will stop moving on the frontend. if it changes type "alarm, ok", it will change color.
+**Flumen** is a real-time visualization engine for tracking moving objects across a dynamic graph. It's designed to receive positional data from an external system (like a factory PLC or logistics API) and render the movement in an interactive, user-configurable interface.
 
-nodes can be created in the frontend and users can change their position and attributes. clicking on an edge will update the location node. 
+Imagine watching items flow along a complex conveyor belt system, seeing their status change in real-time, and being able to replay the data. That's the goal of Flumen.
 
-### Models
+> ⚠️ **Work in Progress**
+>
+> This project is currently under active development. The core backend functionalities are nearing completion, but APIs are subject to change and features are still being added.
 
-entitys are not used are just to rememebr the possible fields.
-models are used as input anbd output if the controllers
-domain have the logic
+---
 
-### What I decided
+## 💡 Core Concepts
 
-https://martinfowler.com/eaaDev/EventSourcing.html
+Flumen's design is based on a few key principles that make it powerful and flexible.
 
+### 1. Node-Centric Tracks
+Unlike traditional graph visualizations where edges represent the path, in Flumen, **specialized `Location` nodes represent the actual tracks**.
+- **Nodes** can be simple points (e.g., a sensor) or tracks (`Location` nodes).
+- **`Location` nodes** have properties like `length` and `speed`. When an item enters a `Location` node, the frontend animates its movement along that node's length at the specified speed.
+- **Edges** simply define the directed flow, indicating the *next* node an item will move to.
 
-edges store the progress of the item in case of stops. (the length done). just a percetage with a datetime and if history is needed, evwnt sourcing
+### 2. Decoupled State: The Reconciliation Loop
+Flumen cleanly separates the "source of truth" from the visualization.
+1.  **External System:** The authoritative source that knows the true location of every item.
+2.  **Flumen Backend:** Listens for events from the external system (e.g., "Item A has arrived at Location 2"). It maintains the official state.
+3.  **Flumen Frontend:** When the backend confirms an item is on a `Location` node, the frontend begins an "optimistic" animation of the item moving along that node. This provides a smooth visual experience without needing constant updates. The item officially moves to the *next* node only when the backend receives another confirmation event.
 
+### 3. Event Sourcing for History and Auditing
+The entire system is built on an **[Event Sourcing](https://martinfowler.com/eaaDev/EventSourcing.html)** architecture. Instead of just storing the current state, we store an immutable sequence of all events that have ever happened (e.g., `NodeCreated`, `ItemMoved`, `NodeAttributeChanged`).
+- **Full History:** Replay events to see the state of the system at any point in time.
+- **Debugging & Auditing:** Provides a complete, unchangeable log of every action.
+- **State Resilience:** If a process stops, the item's progress (e.g., percentage traveled along a `Location` node) can be precisely stored and resumed.
 
-## Future Improvements
+## ✨ Key Features
 
-### 1. Visualization and Performance
-- **Graph Layout Optimization**
-  - Implement force-directed layouts for automatic node organization
-  - Add multiple layout algorithms (hierarchical, circular)
-  - WebGL rendering support for better performance
-- **Real-time Performance**
-  - Node clustering for dense areas
-  - Level-of-detail rendering
-  - Web Workers for non-blocking calculations
+- **Real-time Visualization:** See objects move and states change instantly via WebSockets.
+- **Dynamic Graph Editor:** Create, move, and configure nodes and their connections directly in the UI.
+- **Stateful Animations:** The frontend animates object movement based on the `length` and `speed` attributes of `Location` nodes.
+- **Status-Driven Visuals:** Nodes dynamically change their appearance (e.g., color) to reflect their state (`ok`, `alarm`, `inactive`).
+- **Event-Sourced Backend:** A robust architecture that provides a full, replayable history of the system.
 
-### 2. State Management and Prediction
-- **Predictive Movement**
-  - Basic prediction system for likely movement paths
-  - Ghost previews of future positions
-  - Confidence indicators for predictions
-- **State Handling**
-  - State rollback/forward for debugging
-  - Optimized state diffing
-  - State persistence and recovery
+## 🛠️ Architecture
 
-### 3. User Experience
-- **Interactive Features**
-  - Path planning tools
-  - Timeline view for historical movements
-  - Advanced filtering and search
-- **Monitoring and Alerts**
-  - Configurable condition alerts
-  - System-wide metrics dashboard
-  - Heat maps for traffic analysis
+The project follows a clean separation of concerns:
+- **`Domain`:** Contains all the core business logic, rules, and the event sourcing implementation. It is completely independent of any framework.
+- **`Models`:** Data Transfer Objects (DTOs) used for defining the shape of API inputs and outputs.
+- **`Controllers`:** The API layer that handles HTTP requests, validates input, and orchestrates calls to the domain logic.
 
-### 4. Architecture and Scalability
-- **Backend Optimization**
-  - Path caching
-  - Batch updates
-  - WebSocket compression
-- **Data Management**
-  - Hierarchical location grouping
-  - Historical data archiving
-  - System configuration import/export
+## 🚀 Roadmap: The Vision for Flumen
 
-### 5. Documentation and Testing
-- **Documentation**
-  - Interactive examples and demos
-  - Comprehensive API documentation
-  - Performance guidelines
-- **Testing**
-  - Load testing for scalability
-  - Visual regression testing
-  - Simulation tools
+Here is a look at the planned features and improvements to make Flumen a comprehensive and powerful tool.
 
-### 6. Integration and Extensibility
-- **API Extensions**
-  - Plugin system for custom node types
-  - Custom movement algorithm hooks
-  - External integration event system
-- **Data Sources**
-  - Multi-source real-time data ingestion
-  - Protocol adapters (MQTT, AMQP)
-  - Custom data transformations
+### 📊 Visualization & Performance
+- [ ] **WebGL Rendering:** Migrate the renderer to WebGL (e.g., using `pixi.js` or `react-three-fiber`) for buttery-smooth performance with thousands of nodes.
+- [ ] **Graph Layout Algorithms:** Implement force-directed, hierarchical, and circular layouts for automatic graph organization.
+- [ ] **Node Clustering & LOD:** Automatically group dense nodes and implement Level-of-Detail rendering to maintain performance on large graphs.
 
-### 7. Analytics and Reporting
-- **Movement Analytics**
-  - Path efficiency analysis
-  - Congestion detection
-  - Custom metrics support
-- **Reporting**
-  - Automated report generation
-  - Multiple export formats
-  - Customizable dashboards
+### 🧠 State Management & Prediction
+- [ ] **Predictive Movement:** Develop a "ghost" mode to show the most likely future path of an object.
+- [ ] **State Time-Travel:** Leverage the event-sourced history to create a "timeline" slider for debugging and reviewing past incidents.
+- [ ] **Web Workers:** Move physics and layout calculations to Web Workers to ensure a non-blocking UI.
 
-These improvements aim to enhance the system's functionality, performance, and user experience while maintaining its core concept of node-based movement visualization. 
+### 🧑‍💻 User Experience & Interactivity
+- [ ] **Advanced Monitoring:** Create a central dashboard for system-wide metrics, alerts, and traffic heat maps.
+- [ ] **Pathfinding Tools:** Allow users to select two nodes and highlight the shortest or most efficient path.
+- [ ] **Advanced Filtering & Search:** Implement a powerful search to quickly find nodes or items by their attributes.
+
+### 🏗️ Architecture & Scalability
+- [ ] **Plugin & Extension System:** Design a plugin architecture to allow for custom node types, movement algorithms, and external API integrations.
+- [ ] **Multi-Source Data Ingestion:** Add protocol adapters to ingest real-time data from various sources like **MQTT**, **AMQP**, or **Kafka**.
+- [ ] **Historical Data Archiving:** Implement a strategy for archiving old events to a cold storage solution to keep the primary database fast.
