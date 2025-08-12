@@ -1,6 +1,7 @@
 package livedata.simulator;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.rabbitmq.client.Channel;
 import com.rabbitmq.client.Connection;
 import com.rabbitmq.client.ConnectionFactory;
@@ -8,6 +9,7 @@ import flumen.events.DomainEvent;
 import flumen.events.ItemCreatedEvent;
 import flumen.events.ItemPositionChangedEvent;
 import flumen.events.LocationCreatedEvent;
+import flumen.events.LocationConnectionCreatedEvent;
 
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -28,8 +30,8 @@ public class App {
     private static final String MODE = System.getenv().getOrDefault("SIMULATION_MODE", "api"); // "api" or "rabbit"
     private static final String RABBIT_HOST = "localhost";
     private static final String RABBIT_QUEUE = "sorting-events";
-    private static final ObjectMapper objectMapper = new ObjectMapper();
-
+    private static final ObjectMapper objectMapper = new ObjectMapper()
+            .registerModule(new JavaTimeModule());
     private static Channel rabbitChannel;
 
     public static void main(String[] args) {
@@ -40,21 +42,21 @@ public class App {
             List<String> items = new ArrayList<>();
             List<String> locations = new ArrayList<>();
 
-            // Step 1: Create 1000 Items
+            // Step 1: Create 10 Items
             for (int i = 1; i <= 10; i++) {
                 String itemName = "Item" + i;
                 sendEvent(new ItemCreatedEvent(itemName, itemName, 1.0, true, new HashMap<>()), "POST");
                 items.add(itemName);
             }
 
-            // Step 2: Create 1000 Locations
+            // Step 2: Create 10 Locations
             for (int i = 1; i <= 10; i++) {
                 String locationName = "Location" + i;
                 sendEvent(new LocationCreatedEvent(locationName, locationName, true, 0.0, 0.0, 10.0, 1.0, "conveyor", new HashMap<>()), "POST");
                 locations.add(locationName);
             }
 
-            // Step 3: Establish Initial Connections
+            // Step 3: Establish Initial Item Positions
             for (int i = 0; i < items.size(); i++) {
                 String item = items.get(i);
                 String location = locations.get(i % locations.size()); // Distribute items across locations
@@ -89,6 +91,8 @@ public class App {
     private static void setupRabbit() throws Exception {
         ConnectionFactory factory = new ConnectionFactory();
         factory.setHost(RABBIT_HOST);
+        factory.setUsername("admin");
+        factory.setPassword("admin");
         Connection connection = factory.newConnection();
         rabbitChannel = connection.createChannel();
         rabbitChannel.queueDeclare(RABBIT_QUEUE, false, false, false, null);
@@ -123,10 +127,10 @@ public class App {
 
             HttpRequest request = requestBuilder.build();
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-            if (response.statusCode() == 200) {
+            if (response.statusCode() >= 200 && response.statusCode() < 300) {
                 logger.info(() -> "Sent event to API: " + json);
             } else {
-                logger.warning(() -> "Failed to send event to API: " + response.body());
+                logger.warning(() -> "Failed to send event to API: " + response.statusCode() + " " + response.body());
             }
         }
     }
@@ -138,26 +142,20 @@ public class App {
             return "/locations";
         } else if (event instanceof ItemPositionChangedEvent) {
             return "/positions";
+        } else if (event instanceof LocationConnectionCreatedEvent) { // ADDED: Handle the new event type
+            return "/connections";
         }
         return null;
     }
 
+    // CHANGED: This method is now refactored to use the generic sendEvent method
     private static void createLocationConnection(String locationId1, String locationId2) throws Exception {
-        logger.info(() -> String.format("Creating connection between location %s and location %s", locationId1, locationId2));
-
-        String requestBody = String.format("{\"location1Id\":\"%s\",\"location2Id\":\"%s\"}", locationId1, locationId2);
-
-        HttpRequest request = HttpRequest.newBuilder()
-                .uri(new URI(BASE_URL + "/connections"))
-                .header("Content-Type", "application/json")
-                .POST(HttpRequest.BodyPublishers.ofString(requestBody))
-                .build();
-
-        HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-        if (response.statusCode() == 200) {
-            logger.info("Location connection created successfully.");
-        } else {
-            logger.warning(() -> "Failed to create location connection: " + response.body());
-        }
+        logger.info(() -> String.format("Creating connection event for %s and %s", locationId1, locationId2));
+        
+        // 1. Create the specific event object
+        LocationConnectionCreatedEvent event = new LocationConnectionCreatedEvent(locationId1, locationId2);
+        
+        // 2. Use the central sendEvent method, which respects the SIMULATION_MODE
+        sendEvent(event, "POST");
     }
 }

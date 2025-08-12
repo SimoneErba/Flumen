@@ -4,5 +4,5 @@ CREATE TABLE IF NOT EXISTS default.Snapshot
     snapshot JSON
 )
 ENGINE = MergeTree
-PARTITION BY toYYYYMM(ts)
+PARTITION BY toYYYYMM(date_created)
 PRIMARY KEY (date_created)

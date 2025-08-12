@@ -60,7 +60,7 @@ services:
       - app-network
   clickhouse:
     image: clickhouse/clickhouse-server:latest
-    container_name: clickhouse
+    container_name: clickhouse_flumen
     restart: always
     ports:
       - "8124:8123"
@@ -105,4 +105,5 @@ volumes:
   orientdb-data:
   orientdb-config:
   clickhouse-data:
+  rabbitmq_data:
 
