@@ -1,15 +1,14 @@
 package flumen.events;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
+
 import lombok.Getter;
 
 @Getter
 public class LocationDeletedEvent extends DomainEvent {
-    public LocationDeletedEvent(String locationId) {
+    @JsonCreator
+    public LocationDeletedEvent(@JsonProperty("locationId") String locationId) {
         super(locationId, "LOCATION_DELETED");
-    }
-
-    @Override
-    public void process() {
-        throw new UnsupportedOperationException("Unimplemented method 'process'");
     }
 } 

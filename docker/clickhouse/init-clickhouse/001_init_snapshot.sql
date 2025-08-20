@@ -1,8 +1,9 @@
-CREATE TABLE IF NOT EXISTS default.Snapshot
+CREATE TABLE IF NOT EXISTS default.snapshots
 (
-    date_created DateTime64(3),
-    snapshot JSON
+    `snapshot_id` UUID,
+    `timestamp` DateTime64(3),
+    `graph_data` JSON
 )
 ENGINE = MergeTree
-PARTITION BY toYYYYMM(date_created)
-PRIMARY KEY (date_created)
+PARTITION BY toYYYYMM(timestamp)
+ORDER BY timestamp;

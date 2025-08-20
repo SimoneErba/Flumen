@@ -1,15 +1,14 @@
 package flumen.events;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
+
 import lombok.Getter;
 
 @Getter
 public class ItemActivatedEvent extends DomainEvent {
-    public ItemActivatedEvent(String itemId) {
+    @JsonCreator
+    public ItemActivatedEvent(@JsonProperty("itemId") String itemId) {
         super(itemId, "ITEM_ACTIVATED");
-    }
-
-    @Override
-    public void process() {
-        throw new UnsupportedOperationException("Unimplemented method 'process'");
     }
 } 

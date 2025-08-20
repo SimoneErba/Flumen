@@ -26,25 +26,6 @@ import { BASE_PATH, COLLECTION_FORMATS, BaseAPI, RequiredError, operationServerM
 /**
  * 
  * @export
- * @interface Connection
- */
-export interface Connection {
-    /**
-     * 
-     * @type {string}
-     * @memberof Connection
-     */
-    'sourceId'?: string;
-    /**
-     * 
-     * @type {string}
-     * @memberof Connection
-     */
-    'targetId'?: string;
-}
-/**
- * 
- * @export
  * @interface ConnectionInput
  */
 export interface ConnectionInput {
@@ -84,7 +65,7 @@ export interface ConnectionResponse {
      * @type {string}
      * @memberof ConnectionResponse
      */
-    'type'?: string;
+    'direction'?: string;
     /**
      * 
      * @type {{ [key: string]: object; }}
@@ -166,6 +147,18 @@ export interface Item {
      * @memberof Item
      */
     'properties'?: { [key: string]: object; };
+    /**
+     * 
+     * @type {Location}
+     * @memberof Item
+     */
+    'location'?: Location;
+    /**
+     * 
+     * @type {ProgressInfo}
+     * @memberof Item
+     */
+    'progressInfo'?: ProgressInfo;
 }
 /**
  * 
@@ -303,16 +296,10 @@ export interface Location {
     'properties'?: { [key: string]: object; };
     /**
      * 
-     * @type {Array<Item>}
+     * @type {Set<string>}
      * @memberof Location
      */
-    'items'?: Array<Item>;
-    /**
-     * 
-     * @type {Array<Connection>}
-     * @memberof Location
-     */
-    'connections'?: Array<Connection>;
+    'outboundConnectionIds'?: Set<string>;
 }
 /**
  * 
@@ -447,6 +434,25 @@ export interface LocationResponse {
      * @memberof LocationResponse
      */
     'connections'?: Array<ConnectionResponse>;
+}
+/**
+ * 
+ * @export
+ * @interface ProgressInfo
+ */
+export interface ProgressInfo {
+    /**
+     * 
+     * @type {number}
+     * @memberof ProgressInfo
+     */
+    'progress'?: number;
+    /**
+     * 
+     * @type {string}
+     * @memberof ProgressInfo
+     */
+    'datetime'?: string;
 }
 /**
  * 

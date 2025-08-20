@@ -90,6 +90,7 @@ services:
       - RABBITMQ_DEFAULT_USER=admin
       - RABBITMQ_DEFAULT_PASS=admin
     volumes:
+      - ./rabbitmq/enabled_plugins:/etc/rabbitmq/enabled_plugins
       - rabbitmq_data:/var/lib/rabbitmq
     healthcheck:
       test: ["CMD", "rabbitmqctl", "status"]

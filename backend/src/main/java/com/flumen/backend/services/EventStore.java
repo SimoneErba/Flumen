@@ -1,6 +1,10 @@
 package com.flumen.backend.services;
 
 import flumen.events.DomainEvent;
+
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.orientechnologies.orient.core.db.ODatabaseSession;
 import com.orientechnologies.orient.core.record.OVertex;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -13,7 +17,8 @@ import java.util.List;
 public class EventStore {
     
     private final OrientDBService orientDBService;
-
+    private static final ObjectMapper objectMapper = new ObjectMapper()
+            .registerModule(new JavaTimeModule());
     @Autowired
     public EventStore(OrientDBService orientDBService) {
         this.orientDBService = orientDBService;
@@ -42,7 +47,13 @@ public class EventStore {
         eventVertex.setProperty("entityId", event.getEntityId());
         eventVertex.setProperty("timestamp", event.getTimestamp());
         eventVertex.setProperty("eventType", event.getEventType());
-        eventVertex.setProperty("eventData", event);
+        String eventDataJson;
+        try {
+            eventDataJson = objectMapper.writeValueAsString(event);
+            eventVertex.setProperty("eventData", eventDataJson);
+        } catch (JsonProcessingException e) {
+            e.printStackTrace();
+        }
         eventVertex.save();
     }
 

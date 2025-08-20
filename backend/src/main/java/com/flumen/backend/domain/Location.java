@@ -1,6 +1,8 @@
 package com.flumen.backend.domain;
 
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 
 import flumen.events.LocationActivatedEvent;
 import flumen.events.LocationCreatedEvent;
@@ -20,6 +22,7 @@ public class Location {
     private String type;
     private Boolean active;
     private Map<String, Object> properties;
+    private Set<String> outboundConnectionIds = new HashSet<>();
 
     public Location(
         String id,
@@ -41,6 +44,7 @@ public class Location {
         this.type = type;
         this.active = active;
         this.properties = properties;
+        this.outboundConnectionIds = new HashSet<>();
     }
 
     public Location(LocationCreatedEvent event) {
@@ -65,5 +69,19 @@ public class Location {
 
     public void deactivate(LocationDeactivatedEvent event) {
         this.active = false;
+    }
+
+    public void addConnectionTo(String toLocationId) {
+        if (toLocationId != null && !this.id.equals(toLocationId)) {
+            this.outboundConnectionIds.add(toLocationId);
+        }
+    }
+
+    public void removeConnectionTo(String toLocationId) {
+        this.outboundConnectionIds.remove(toLocationId);
+    }
+
+    public boolean canMoveTo(String targetLocationId) {
+        return this.outboundConnectionIds.contains(targetLocationId);
     }
 } 

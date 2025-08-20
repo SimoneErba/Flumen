@@ -3,17 +3,16 @@ package flumen.events;
 import lombok.Getter;
 import java.util.Map;
 
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonProperty;
+
 @Getter
 public class LocationPropertiesUpdatedEvent extends DomainEvent {
     private final Map<String, Object> updatedProperties;
 
-    public LocationPropertiesUpdatedEvent(String locationId, Map<String, Object> updatedProperties) {
+    @JsonCreator
+    public LocationPropertiesUpdatedEvent(@JsonProperty("locationId") String locationId, @JsonProperty("updatedProperties") Map<String, Object> updatedProperties) {
         super(locationId, "LOCATION_UPDATED");
         this.updatedProperties = updatedProperties;
-    }
-
-    @Override
-    public void process() {
-        throw new UnsupportedOperationException("Unimplemented method 'process'");
     }
 } 

@@ -1,27 +1,39 @@
 package com.flumen.backend.services;
 
+import com.flumen.backend.config.RequestLoggingFilter;
 import com.flumen.backend.domain.Location;
 import flumen.events.DomainEvent;
 import com.flumen.backend.models.UpdateModel;
 import com.flumen.backend.models.input.LocationInput;
 import com.flumen.backend.utils.OrientDBUtils;
 import com.orientechnologies.orient.core.db.ODatabaseSession;
+import com.orientechnologies.orient.core.exception.OConcurrentModificationException;
 import com.orientechnologies.orient.core.id.ORID;
 import com.orientechnologies.orient.core.id.ORecordId;
+import com.orientechnologies.orient.core.record.ODirection;
+import com.orientechnologies.orient.core.record.OEdge;
 import com.orientechnologies.orient.core.record.OVertex;
 import com.orientechnologies.orient.core.sql.executor.OResult;
 import com.orientechnologies.orient.core.sql.executor.OResultSet;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 @Service
 public class LocationService {
 
     private final OrientDBService orientDBService;
     private final UpdateService updateService;
+    private static final Logger logger = LoggerFactory.getLogger(LocationService.class);
 
     @Autowired
     public LocationService(OrientDBService orientDBService, UpdateService updateService) {
@@ -84,6 +96,33 @@ public class LocationService {
         return vertexToLocation(this.updateService.updateVertex(model));
     }
 
+    public Location fullUpdateLocation(Location location) {
+        try (ODatabaseSession db = orientDBService.getSession()) {
+            OVertex locationVertex = OrientDBUtils.loadAndValidateVertexByCustomId(db, location.getId());
+    
+            locationVertex.setProperty("name", location.getName());
+            locationVertex.setProperty("latitude", location.getLatitude());
+            locationVertex.setProperty("longitude", location.getLongitude());
+            locationVertex.setProperty("length", location.getLength());
+            locationVertex.setProperty("speed", location.getSpeed());
+            locationVertex.setProperty("type", location.getType());
+            locationVertex.setProperty("active", location.getActive());
+            locationVertex.setProperty("properties", location.getProperties());
+            
+            reconcileConnections(db, locationVertex, location.getOutboundConnectionIds());
+    
+            locationVertex.save();
+            
+            return vertexToLocation(locationVertex);
+    
+        }
+        catch (OConcurrentModificationException oce) {
+            throw oce;
+        } catch (Exception e) {
+            throw new RuntimeException("Error during full update of location with ID " + location.getId(), e);
+        }
+    }
+
     public void deleteLocation(String id) {
         try (ODatabaseSession db = orientDBService.getSession()) {
             ORID theRid = new ORecordId(id);
@@ -98,12 +137,46 @@ public class LocationService {
         }
     }
 
+    /**
+     * A helper method to efficiently update the 'ConnectedTo' edges for a location.
+     * It compares the current state in the DB with the desired state from the domain object
+     * and only adds/removes the edges that have changed.
+     */
+    private void reconcileConnections(ODatabaseSession db, OVertex fromVertex, Set<String> desiredConnectionIds) {
+        Map<String, OEdge> currentEdges = new HashMap<>();
+        for (OEdge edge : fromVertex.getEdges(ODirection.OUT, "ConnectedTo")) {
+            OVertex connectedVertex = edge.getTo();
+            if (connectedVertex != null) {
+                currentEdges.put(connectedVertex.getProperty("id"), edge);
+            }
+        }
+        Set<String> currentConnectionIds = currentEdges.keySet();
+
+        Set<String> idsToDelete = new HashSet<>(currentConnectionIds);
+        idsToDelete.removeAll(desiredConnectionIds);
+        
+        for (String idToDelete : idsToDelete) {
+            OEdge edgeToDelete = currentEdges.get(idToDelete);
+            edgeToDelete.delete();
+            logger.info("Deleted connection from {} to {}", fromVertex.getProperty("id"), idToDelete);
+        }
+
+        Set<String> idsToAdd = new HashSet<>(desiredConnectionIds);
+        idsToAdd.removeAll(currentConnectionIds);
+
+        for (String idToAdd : idsToAdd) {
+            OVertex toLocationVertex = OrientDBUtils.loadAndValidateVertexByCustomId(db, idToAdd);
+            fromVertex.addEdge(toLocationVertex, "ConnectedTo").save();
+            logger.info("Created connection from {} to {}", fromVertex.getProperty("id"), idToAdd);
+        }
+    }
+
     private Location vertexToLocation(OVertex vertex) {
         if (vertex == null) {
             throw new IllegalArgumentException("Attempted to convert a null vertex to location.");
         }
         return new Location(
-            vertex.getIdentity().toString(),
+            vertex.getProperty("customId"),
             vertex.getProperty("name"),
             vertex.getProperty("latitude"),
             vertex.getProperty("longitude"),

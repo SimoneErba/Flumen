@@ -6,6 +6,7 @@
 /home/simone/Desktop/Flumen/commons/src/main/java/flumen/events/ItemPropertiesUpdatedEvent.java
 /home/simone/Desktop/Flumen/commons/src/main/java/flumen/events/ItemSpeedChangedEvent.java
 /home/simone/Desktop/Flumen/commons/src/main/java/flumen/events/LocationActivatedEvent.java
+/home/simone/Desktop/Flumen/commons/src/main/java/flumen/events/LocationConnectionCreatedEvent.java
 /home/simone/Desktop/Flumen/commons/src/main/java/flumen/events/LocationCreatedEvent.java
 /home/simone/Desktop/Flumen/commons/src/main/java/flumen/events/LocationDeactivatedEvent.java
 /home/simone/Desktop/Flumen/commons/src/main/java/flumen/events/LocationDeletedEvent.java

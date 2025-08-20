@@ -4,6 +4,8 @@ import com.orientechnologies.orient.core.db.ODatabasePool;
 import com.orientechnologies.orient.core.db.ODatabaseSession;
 import com.orientechnologies.orient.core.db.OrientDB;
 import com.orientechnologies.orient.core.db.OrientDBConfig;
+import com.orientechnologies.orient.core.metadata.schema.OClass;
+import com.orientechnologies.orient.core.metadata.schema.OType;
 import com.flumen.backend.entities.Location;
 import com.orientechnologies.orient.core.config.OGlobalConfiguration;
 import org.slf4j.Logger;
@@ -47,11 +49,13 @@ public class OrientDBService {
 
         withSession(session -> {
             if (session.getClass("Location") == null) {
-                session.createVertexClass("Location");
+                OClass locationClass = session.createVertexClass("Location");
+                locationClass.createProperty("customId", OType.STRING);
                 logger.info("Created vertex class: Location");
             }
             if (session.getClass("Item") == null) {
-                session.createVertexClass("Item");
+                OClass itemClass = session.createVertexClass("Item");
+                itemClass.createProperty("customId", OType.STRING);
                 logger.info("Created vertex class: Item");
             }
             if (session.getClass("GeoLocation") == null) {
@@ -78,6 +82,18 @@ public class OrientDBService {
             if (session.getClass("ConnectedTo") == null) {
                 session.createEdgeClass("ConnectedTo");
                 logger.info("Created edge class: ConnectedTo");
+            }
+
+            OClass itemClass = session.getClass("Item");
+            if (itemClass != null && itemClass.getClassIndex("Item.id_unique") == null) {
+                itemClass.createIndex("Item.id_unique", OClass.INDEX_TYPE.UNIQUE, "customId");
+                logger.info("Created unique index on Item.id");
+            }
+
+            OClass locationClass = session.getClass("Location");
+            if (locationClass != null && locationClass.getClassIndex("Location.id_unique") == null) {
+                locationClass.createIndex("Location.id_unique", OClass.INDEX_TYPE.UNIQUE, "customId");
+                logger.info("Created unique index on Location.id");
             }
         });
     }

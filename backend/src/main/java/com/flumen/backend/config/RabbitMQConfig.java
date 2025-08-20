@@ -1,5 +1,8 @@
 package com.flumen.backend.config;
 
+import java.util.HashMap;
+import java.util.Map;
+
 import org.springframework.amqp.core.*;
 import org.springframework.amqp.rabbit.connection.ConnectionFactory;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
@@ -27,16 +30,24 @@ public class RabbitMQConfig {
     }
 
     @Bean
-    public TopicExchange itemEventsExchange() {
-        return new TopicExchange(itemEventsExchange);
+    public CustomExchange itemEventsExchange() {
+        // This is the classic way to create a custom exchange, which works in older Spring AMQP versions.
+        
+        Map<String, Object> arguments = new HashMap<>();
+        arguments.put("hash-header", "x-consistent-hash-by");
+
+        // The constructor takes: name, type, durable, autoDelete, arguments
+        return new CustomExchange(itemEventsExchange, "x-consistent-hash", true, false, arguments);
     }
 
     @Bean
-    public Binding itemEventsBinding(Queue itemEventsQueue, TopicExchange itemEventsExchange) {
-        return BindingBuilder
-                .bind(itemEventsQueue)
+    public Binding itemEventsBinding(Queue itemEventsQueue, CustomExchange itemEventsExchange) {
+        // For this exchange type, the routing key is what gets hashed.
+        // It is NOT a wildcard like "#".
+        return BindingBuilder.bind(itemEventsQueue)
                 .to(itemEventsExchange)
-                .with(itemEventsRoutingKey);
+                .with(itemEventsRoutingKey) // Use your specific routing key
+                .noargs();
     }
 
     @Bean

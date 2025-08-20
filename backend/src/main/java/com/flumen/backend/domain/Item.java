@@ -62,8 +62,20 @@ public class Item {
         }
     }
 
-    public void updatePosition(Location location) {
-        this.location = location;
+    public void updatePosition(Location newLocation) {
+        if (this.location == null) {
+            this.location = newLocation;
+            return;
+        }
+
+        if (this.location.canMoveTo(newLocation.getId())) {
+            this.location = newLocation;
+        } else {
+            throw new IllegalStateException(
+                "Cannot move item " + this.id + " from location " + this.location.getId() +
+                " to unconnected location " + newLocation.getId()
+            );
+        }    
     }
 
     public void updateSpeed(ItemSpeedChangedEvent event) {

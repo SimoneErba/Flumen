@@ -97,7 +97,6 @@ const LoadGraph = ({initialGraphData}: LoadGraphProps) => {
       });
     });
 
-    console.log("GRAPH", initialGraphData);
     useloadGraph(graph);
     // Animation function to move the item along the edges
     // let t = 0;
