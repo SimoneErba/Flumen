@@ -1,4 +1,6 @@
-# Flumen
+<p align="center">
+  <img src="logo.svg" alt="Flumen Logo" width="350"/>
+</p>
 
 **Flumen** is a real-time visualization engine for tracking moving objects across a dynamic graph. It's designed to receive positional data from an external system (like a factory PLC or logistics API) and render the movement in an interactive, user-configurable interface.
 
@@ -12,10 +14,10 @@ Imagine watching items flow along a complex conveyor belt system, seeing their s
 
 ## 💡 Core Concepts
 
-Flumen's design is based on a few key principles that make it powerful and flexible.
+Flumen's design is based on a few key principles:
 
 ### 1. Node-Centric Tracks
-Unlike traditional graph visualizations where edges represent the path, in Flumen, **specialized `Location` nodes represent the actual tracks**.
+Unlike traditional graph visualizations where edges represent the path, in Flumen, **specialized `Location` nodes represent the actual tracks**, this helps in tracking the exact item position and progress on the section.
 - **Nodes** can be simple points (e.g., a sensor) or tracks (`Location` nodes).
 - **`Location` nodes** have properties like `length` and `speed`. When an item enters a `Location` node, the frontend animates its movement along that node's length at the specified speed.
 - **Edges** simply define the directed flow, indicating the *next* node an item will move to.
@@ -53,7 +55,6 @@ Here is a look at the planned features and improvements to make Flumen a compreh
 
 ### 📊 Visualization & Performance
 - [ ] **WebGL Rendering:** Migrate the renderer to WebGL (e.g., using `pixi.js` or `react-three-fiber`) for buttery-smooth performance with thousands of nodes.
-- [ ] **Graph Layout Algorithms:** Implement force-directed, hierarchical, and circular layouts for automatic graph organization.
 - [ ] **Node Clustering & LOD:** Automatically group dense nodes and implement Level-of-Detail rendering to maintain performance on large graphs.
 
 ### 🧠 State Management & Prediction
