@@ -1,4 +1,6 @@
-# Flumen
+<p align="center">
+  <img src="logo.svg" alt="Flumen Logo" width="350"/>
+</p>
 
 **Flumen** is a real-time visualization engine for tracking moving objects across a dynamic graph. It's designed to receive positional data from an external system (like a factory PLC or logistics API) and render the movement in an interactive, user-configurable interface.
 
