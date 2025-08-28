@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useMemo, useRef, useCallback } from "react";
+import React, { useEffect, useState, useRef, useCallback } from "react";
 import {
   SigmaContainer,
   useSigma,
@@ -6,16 +6,83 @@ import {
   ControlsContainer,
   ZoomControl,
   FullScreenControl,
+  EdgeReducer,
   useRegisterEvents,
 } from "@react-sigma/core";
 import { MultiDirectedGraph } from "graphology";
 import { NodeSquareProgram } from "@sigma/node-square";
 import "@react-sigma/core/lib/react-sigma.min.css";
+
+// Assuming these are in your project structure
 import { hashToNumber } from "../utils/hash";
 import { GraphData } from "../api-client";
 
-const sigmaStyle = { height: "100vh", width: "100vw" };
+const sigmaStyle: React.CSSProperties = { height: "100vh", width: "100vw" };
 
+// --- Edge Editor Component (No changes) ---
+interface EdgeEditorData {
+  edgeId: string;
+  sourceId: string;
+  targetId: string;
+  speed: number;
+  length: number;
+}
+
+interface EdgeEditorProps {
+  data: EdgeEditorData;
+  onClose: () => void;
+  onSubmit: (updatedData: { speed: number; length: number; isReversed: boolean }) => void;
+}
+
+const EdgeEditor = ({ data, onClose, onSubmit }: EdgeEditorProps) => {
+  const [speed, setSpeed] = useState(data.speed);
+  const [length, setLength] = useState(data.length);
+  const [isReversed, setIsReversed] = useState(false);
+
+  const handleSubmit = () => {
+    onSubmit({ speed: Number(speed), length: Number(length), isReversed });
+    onClose();
+  };
+
+  const currentSourceLabel = isReversed ? data.targetId : data.sourceId;
+  const currentTargetLabel = isReversed ? data.sourceId : data.targetId;
+
+  return (
+    <div style={editorStyle}>
+      <h4>Edit Path</h4>
+      <p><b>From:</b> {currentSourceLabel}</p>
+      <p><b>To:</b> {currentTargetLabel}</p>
+      
+      <label>Speed:</label>
+      <input type="number" value={speed} onChange={e => setSpeed(Number(e.target.value))} />
+      
+      <label>Length:</label>
+      <input type="number" value={length} onChange={e => setLength(Number(e.target.value))} />
+      
+      <div style={buttonGroupStyle}>
+        <button onClick={() => setIsReversed(!isReversed)}>
+          {isReversed ? 'Direction Reversed' : 'Reverse Direction'}
+        </button>
+      </div>
+
+      <div style={iconGroupStyle}>
+        <button onClick={onClose} title="Close">❌</button>
+        <button onClick={handleSubmit} title="Submit">✔️</button>
+      </div>
+    </div>
+  );
+};
+
+const editorStyle: React.CSSProperties = {
+  position: 'absolute', top: '10px', right: '10px', background: 'white',
+  padding: '10px', border: '1px solid #ccc', borderRadius: '8px',
+  boxShadow: '0 2px 10px rgba(0,0,0,0.1)', zIndex: 100,
+  display: 'flex', flexDirection: 'column', gap: '8px'
+};
+const buttonGroupStyle: React.CSSProperties = { display: 'flex', justifyContent: 'center', marginTop: '10px' };
+const iconGroupStyle: React.CSSProperties = { display: 'flex', justifyContent: 'space-between', marginTop: '10px' };
+
+// --- Graph Logic Component ---
 interface AnimationState {
   sourceId: string;
   targetId: string;
@@ -23,214 +90,252 @@ interface AnimationState {
   duration: number;
 }
 
-interface LoadGraphProps {
+interface GraphEventsProps {
   initialGraphData: GraphData;
+  setHoveredEdge: (edge: string | null) => void;
 }
 
-const LoadGraph = ({ initialGraphData }: LoadGraphProps) => {
+const GraphEvents = ({ initialGraphData, setHoveredEdge }: GraphEventsProps) => {
   const sigma = useSigma();
-  const loadGraph = useLoadGraph();
   const registerEvents = useRegisterEvents();
+  const loadGraph = useLoadGraph();
 
   const draggedNodeRef = useRef<string | null>(null);
   const isDraggingRef = useRef<boolean>(false);
-
-  const [graphData, setGraphData] = useState<{ nodes: any[]; edges: any[] }>({ nodes: [], edges: [] });
+  const [selectedEdgeData, setSelectedEdgeData] = useState<EdgeEditorData | null>(null);
+  
+  // State and Ref for the animation
   const [animatingItems, setAnimatingItems] = useState<Record<string, AnimationState>>({});
+  const animatingItemsRef = useRef<Record<string, AnimationState>>(animatingItems);
+  animatingItemsRef.current = animatingItems;
   const animationFrameId = useRef<number | null>(null);
 
-  const locationDataMap = useMemo(() => {
-    const map = new Map();
-    initialGraphData.locations.forEach(loc => map.set(loc.id, loc));
-    return map;
-  }, [initialGraphData.locations]);
-
-  const connectionMap = useMemo(() => {
-    const map = new Map();
-    initialGraphData.connections.forEach(conn => map.set(conn.sourceId, conn.targetId));
-    return map;
-  }, [initialGraphData.connections]);
-
-  useEffect(() => {
-    const nodes = [
-      ...initialGraphData.locations.map(location => ({
-        id: location.id,
-        x: location.longitude ?? hashToNumber(location.id),
-        y: location.latitude ?? hashToNumber(location.id + "random"),
-        type: "location",
-        label: location.name
-      })),
-      ...initialGraphData.locations.flatMap(location =>
-        (location.items || []).map(item => ({
-          id: item.id,
-          x: location.longitude ?? hashToNumber(location.id),
-          y: location.latitude ?? hashToNumber(location.id + "random"),
-          type: "item",
-          label: item.name,
-          initialLocationId: location.id,
-        }))
-      )
-    ];
-    const edges = initialGraphData.connections.map(c => ({ source: c.sourceId, target: c.targetId }));
-    setGraphData({ nodes, edges });
-  }, [initialGraphData]);
 
   useEffect(() => {
     const graph = new MultiDirectedGraph();
-    graphData.nodes.filter(n => n.type === "location").forEach(({ id, x, y, label }) => {
-      graph.addNode(id, { x, y, label, size: 10, color: "#69b3a2" });
+    // Graph loading logic
+    initialGraphData.locations.forEach(location => {
+      graph.addNode(location.id, {
+        x: location.longitude ?? hashToNumber(location.id),
+        y: location.latitude ?? hashToNumber(location.id + "random"),
+        label: location.name, size: 10, color: "#69b3a2",
+        speed: location.speed, length: location.length,
+      });
     });
-    graphData.edges.forEach(e => {
-        if (!graph.hasNode(e.source) || !graph.hasNode(e.target)) return;
-        graph.addEdge(e.source, e.target, { type: 'arrow', size: 2 });
+    initialGraphData.locations.forEach(location => {
+      (location.items || []).forEach(item => {
+        graph.addNode(item.id, {
+          x: location.longitude ?? hashToNumber(location.id),
+          y: location.latitude ?? hashToNumber(location.id + "random"),
+          label: item.name, size: 8, color: "#FF0000", type: "square",
+          initialLocationId: location.id,
+        });
+      });
     });
-    graphData.nodes.filter(n => n.type === "item").forEach(n => {
-        const { initialLocationId, ...nodeProps } = n;
-        graph.addNode(n.id, { ...nodeProps, size: 8, color: "#FF0000", type: "square" });
+    initialGraphData.connections.forEach(c => {
+      if (graph.hasNode(c.sourceId) && graph.hasNode(c.targetId)) {
+        graph.addEdge(c.sourceId, c.targetId, { type: 'arrow', size: 5 });
+      }
     });
     loadGraph(graph);
 
-    const initialAnimations = {};
-    graphData.nodes.filter(n => n.type === "item").forEach(item => {
-      const sourceLoc = locationDataMap.get(item.initialLocationId);
-      if (sourceLoc && sourceLoc.speed > 0) {
-        const targetId = connectionMap.get(item.initialLocationId);
-        if (targetId) {
-          const duration = (sourceLoc.length / sourceLoc.speed) * 1000;
-          initialAnimations[item.id] = { sourceId: item.initialLocationId, targetId, startTime: Date.now(), duration };
+    // Initial animation setup
+    const initialAnimations: Record<string, AnimationState> = {};
+    graph.forEachNode((node, attrs) => {
+      if (attrs.type === "square") {
+        const sourceLocAttrs = graph.getNodeAttributes(attrs.initialLocationId);
+        const nextTargets = graph.outEdges(attrs.initialLocationId).map(edge => graph.target(edge));
+        const uniqueTargets = [...new Set(nextTargets)];
+        if (sourceLocAttrs && sourceLocAttrs.speed > 0 && uniqueTargets.length === 1) {
+          const targetId = uniqueTargets[0];
+          const duration = (sourceLocAttrs.length / sourceLocAttrs.speed) * 1000;
+          initialAnimations[node] = { sourceId: attrs.initialLocationId, targetId, startTime: Date.now(), duration };
         }
       }
     });
     setAnimatingItems(initialAnimations);
-  }, [loadGraph, graphData, locationDataMap, connectionMap]);
+  }, [initialGraphData, loadGraph]);
 
+  // *** FIX: Optimized animation useEffect ***
   useEffect(() => {
     const animate = () => {
-        const graph = sigma.getGraph();
-        const currentTime = Date.now();
-        let needsRefresh = false;
-        const nextAnimatingItems = { ...animatingItems };
-        for (const itemId in animatingItems) {
-            if (itemId === draggedNodeRef.current) continue;
-            const anim = animatingItems[itemId];
-            const sourceNode = graph.getNodeAttributes(anim.sourceId);
-            const targetNode = graph.getNodeAttributes(anim.targetId);
-            if (!sourceNode || !targetNode) continue;
-            const progress = Math.min((currentTime - anim.startTime) / anim.duration, 1);
-            graph.setNodeAttribute(itemId, "x", sourceNode.x + (targetNode.x - sourceNode.x) * progress);
-            graph.setNodeAttribute(itemId, "y", sourceNode.y + (targetNode.y - sourceNode.y) * progress);
-            needsRefresh = true;
-            if (progress >= 1) {
-                const newSourceId = anim.targetId;
-                const newSourceLocation = locationDataMap.get(newSourceId);
-                const newTargetId = connectionMap.get(newSourceId);
-                if (newTargetId && newSourceLocation && newSourceLocation.speed > 0) {
-                    const duration = (newSourceLocation.length / newSourceLocation.speed) * 1000;
-                    nextAnimatingItems[itemId] = { sourceId: newSourceId, targetId: newTargetId, startTime: Date.now(), duration };
-                } else {
-                    delete nextAnimatingItems[itemId];
-                }
-            }
-        }
-        setAnimatingItems(nextAnimatingItems);
-        if (needsRefresh) sigma.refresh();
+      const graph = sigma.getGraph();
+      if (!graph) {
         animationFrameId.current = requestAnimationFrame(animate);
+        return;
+      }
+      
+      const currentTime = Date.now();
+      let needsRefresh = false;
+      let itemsHaveChanged = false;
+      const nextAnimatingItems = { ...animatingItemsRef.current };
+
+      for (const itemId in animatingItemsRef.current) {
+        if (itemId === draggedNodeRef.current) continue;
+
+        const anim = animatingItemsRef.current[itemId];
+        const sourceNode = graph.getNodeAttributes(anim.sourceId);
+        const targetNode = graph.getNodeAttributes(anim.targetId);
+        if (!sourceNode || !targetNode) continue;
+
+        const progress = Math.min((currentTime - anim.startTime) / anim.duration, 1);
+        graph.setNodeAttribute(itemId, "x", sourceNode.x + (targetNode.x - sourceNode.x) * progress);
+        graph.setNodeAttribute(itemId, "y", sourceNode.y + (targetNode.y - sourceNode.y) * progress);
+        needsRefresh = true;
+
+        if (progress >= 1) {
+          itemsHaveChanged = true;
+          const newSourceId = anim.targetId;
+          const newSourceLocationAttrs = graph.getNodeAttributes(newSourceId);
+          const nextPossibleTargets = graph.outEdges(newSourceId).map(edge => graph.target(edge));
+          const uniqueNextTargets = [...new Set(nextPossibleTargets)];
+
+          if (uniqueNextTargets.length === 1 && newSourceLocationAttrs && newSourceLocationAttrs.speed > 0) {
+            const newTargetId = uniqueNextTargets[0];
+            const duration = (newSourceLocationAttrs.length / newSourceLocationAttrs.speed) * 1000;
+            nextAnimatingItems[itemId] = { sourceId: newSourceId, targetId: newTargetId, startTime: Date.now(), duration };
+          } else {
+            delete nextAnimatingItems[itemId];
+          }
+        }
+      }
+
+      if (needsRefresh) sigma.refresh();
+
+      // Only trigger a state update (and re-render) when an item's path changes
+      if (itemsHaveChanged) {
+        setAnimatingItems(nextAnimatingItems);
+      }
+      
+      animationFrameId.current = requestAnimationFrame(animate);
     };
+
     animationFrameId.current = requestAnimationFrame(animate);
-    return () => { if (animationFrameId.current) cancelAnimationFrame(animationFrameId.current); };
-  }, [sigma, animatingItems, locationDataMap, connectionMap]);
+    return () => {
+      if (animationFrameId.current) cancelAnimationFrame(animationFrameId.current);
+    };
+  }, [sigma]); // The dependency array is now minimal
+
+  const handleEdgeSubmit = useCallback(({ speed, length, isReversed }: { speed: number; length: number; isReversed: boolean }) => {
+    if (!selectedEdgeData) return;
+    const graph = sigma.getGraph();
+    const { sourceId, targetId, edgeId } = selectedEdgeData;
+    const sourceOfEdit = isReversed ? targetId : sourceId;
+    
+    graph.setNodeAttribute(sourceOfEdit, 'speed', speed);
+    graph.setNodeAttribute(sourceOfEdit, 'length', length);
+
+    if (isReversed) {
+      if (graph.hasEdge(edgeId)) {
+        graph.dropEdge(edgeId);
+        graph.addEdge(targetId, sourceId, { type: 'arrow', size: 5 });
+      }
+    }
+    sigma.refresh();
+  }, [sigma, selectedEdgeData]);
 
   const addNode = useCallback((x: number, y: number) => {
+    const graph = sigma.getGraph();
+    if (!graph) return;
     const newNodeId = crypto.randomUUID();
-    const newNode = { id: newNodeId, x, y, type: "location", label: "New Location" };
-    const closestNodes = graphData.nodes
-      .filter(n => n.type === 'location')
-      .map(n => ({ nodeId: n.id, distance: Math.pow(x - n.x, 2) + Math.pow(y - n.y, 2) }))
+    const closestNodes = graph.nodes()
+      .filter(nodeId => !graph.getNodeAttribute(nodeId, "type"))
+      .map(nodeId => {
+        const attrs = graph.getNodeAttributes(nodeId);
+        return { nodeId, distance: Math.pow(x - attrs.x, 2) + Math.pow(y - attrs.y, 2) };
+      })
       .sort((a, b) => a.distance - b.distance)
       .slice(0, 2);
-    setGraphData(prev => ({
-      nodes: [...prev.nodes, newNode],
-      edges: [...prev.edges, ...closestNodes.map(e => ({ source: newNodeId, target: e.nodeId }))],
-    }));
-  }, [graphData]);
+
+    graph.addNode(newNodeId, { x, y, label: "New Location", size: 10, color: "#69b3a2", speed: 10, length: 50 });
+
+    closestNodes.forEach(e => {
+      graph.addEdge(e.nodeId, newNodeId, { type: 'arrow', size: 5 });
+      graph.addEdge(newNodeId, e.nodeId, { type: 'arrow', size: 5 });
+    });
+  }, [sigma]);
 
   useEffect(() => {
-    const dragEnd = () => {
-      if (draggedNodeRef.current) {
-        sigma.getSettings().mouseEnabled = true;
-        const draggedNode = draggedNodeRef.current;
-        const pos = {
-          x: sigma.getGraph().getNodeAttribute(draggedNode, "x"),
-          y: sigma.getGraph().getNodeAttribute(draggedNode, "y")
-        };
-        setGraphData(currentGraphData => {
-            const newNodes = currentGraphData.nodes.map(node =>
-                node.id === draggedNode ? { ...node, x: pos.x, y: pos.y } : node
-            );
-            return { ...currentGraphData, nodes: newNodes };
-        });
-      }
-      isDraggingRef.current = false;
-      draggedNodeRef.current = null;
-    };
-
     registerEvents({
-      // --- START OF THE FIX ---
-      clickStage: (event) => {
-        // Do not add a node if a drag was in progress
-        if (!isDraggingRef.current) {
-          // CONVERT the viewport coordinates to graph coordinates
-          const pos = sigma.viewportToGraph(event.event);
+      enterEdge: ({ edge }) => setHoveredEdge(edge),
+      leaveEdge: () => setHoveredEdge(null),
+      clickEdge: ({ edge }) => {
+        const graph = sigma.getGraph();
+        const sourceId = graph.source(edge);
+        const targetId = graph.target(edge);
+        const sourceAttrs = graph.getNodeAttributes(sourceId);
+        setSelectedEdgeData({
+          edgeId: edge, sourceId, targetId,
+          speed: sourceAttrs.speed || 0, length: sourceAttrs.length || 0,
+        });
+      },
+      clickStage: ({ event }) => {
+        if (selectedEdgeData) {
+          setSelectedEdgeData(null);
+        } else if (!isDraggingRef.current) {
+          const pos = sigma.viewportToGraph(event);
           addNode(pos.x, pos.y);
         }
       },
-      // --- END OF THE FIX ---
-      downNode: (event) => {
-        if (sigma.getGraph().getNodeAttribute(event.node, "type") !== "square") {
-          draggedNodeRef.current = event.node;
+      downNode: ({ node }) => {
+        setSelectedEdgeData(null);
+        if (sigma.getGraph().getNodeAttribute(node, "type") !== "square") {
+          isDraggingRef.current = true;
+          draggedNodeRef.current = node;
         }
       },
+      mouseup: () => {
+        isDraggingRef.current = false;
+        draggedNodeRef.current = null;
+      },
       mousemove: (event) => {
-        if (draggedNodeRef.current) {
-          isDraggingRef.current = true;
-          sigma.getSettings().mouseEnabled = false;
-          event.preventSigmaDefault();
+        if (isDraggingRef.current && draggedNodeRef.current) {
           const pos = sigma.viewportToGraph(event);
           sigma.getGraph().setNodeAttribute(draggedNodeRef.current, "x", pos.x);
           sigma.getGraph().setNodeAttribute(draggedNodeRef.current, "y", pos.y);
         }
       },
-      mouseup: () => {
-        if (isDraggingRef.current) {
-          dragEnd();
-        }
-      },
-      mouseleave: () => {
-        if (isDraggingRef.current) {
-          dragEnd();
-        }
-      }
     });
-  }, [registerEvents, sigma, addNode]);
+  }, [sigma, registerEvents, addNode, selectedEdgeData, setHoveredEdge]);
 
-  return null;
-};
-
-export const DisplayGraph = ({ initialGraphData }: { initialGraphData: GraphData }) => {
   return (
-    <SigmaContainer 
-        style={sigmaStyle}
-        settings={{
-            nodeProgramClasses: {
-                square: NodeSquareProgram,
-            },
-        }}
-    >
-      <LoadGraph initialGraphData={initialGraphData} />
+    <>
+      {selectedEdgeData && (
+        <EdgeEditor
+          data={selectedEdgeData}
+          onSubmit={handleEdgeSubmit}
+          onClose={() => setSelectedEdgeData(null)}
+        />
+      )}
       <ControlsContainer position={"bottom-right"}>
         <ZoomControl />
         <FullScreenControl />
       </ControlsContainer>
+    </>
+  );
+};
+
+// --- Main Display Component ---
+export const DisplayGraph = ({ initialGraphData }: { initialGraphData: GraphData }) => {
+  const [hoveredEdge, setHoveredEdge] = useState<string | null>(null);
+
+  const edgeReducer = useCallback<EdgeReducer>((edge, attrs) => {
+    if (hoveredEdge === edge) {
+      return { ...attrs, color: "#ff5500", size: 7 };
+    }
+    return attrs;
+  }, [hoveredEdge]);
+
+  return (
+    <SigmaContainer
+      style={{ ...sigmaStyle, cursor: hoveredEdge ? 'pointer' : 'default' }}
+      settings={{
+        nodeProgramClasses: { square: NodeSquareProgram },
+        enableEdgeEvents: true,
+      }}
+      edgeReducer={edgeReducer}
+    >
+      <GraphEvents initialGraphData={initialGraphData} setHoveredEdge={setHoveredEdge} />
     </SigmaContainer>
   );
 };
