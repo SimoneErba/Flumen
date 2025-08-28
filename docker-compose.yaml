@@ -83,6 +83,7 @@ services:
     
   rabbitmq:
     image: rabbitmq:3.12-management
+    restart: always
     ports:
       - "5672:5672"   # AMQP protocol port
       - "15672:15672" # Management UI port
