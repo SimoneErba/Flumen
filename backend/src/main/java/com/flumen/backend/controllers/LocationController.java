@@ -7,7 +7,6 @@ import com.flumen.backend.domain.Location;
 import com.flumen.backend.models.UpdateModel;
 import com.flumen.backend.models.input.LocationInput;
 import com.flumen.backend.services.LocationService;
-import com.flumen.backend.services.UpdateService;
 
 import java.util.List;
 

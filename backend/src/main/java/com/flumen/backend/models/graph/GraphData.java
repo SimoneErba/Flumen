@@ -2,7 +2,6 @@ package com.flumen.backend.models.graph;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 
 import com.flumen.backend.models.response.ConnectionResponse;
 import com.flumen.backend.models.response.LocationResponse;

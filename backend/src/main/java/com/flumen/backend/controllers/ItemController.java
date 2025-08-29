@@ -7,11 +7,9 @@ import org.springframework.web.bind.annotation.*;
 import com.flumen.backend.domain.Item;
 import com.flumen.backend.models.UpdateModel;
 import com.flumen.backend.models.input.ItemInput;
-import com.flumen.backend.models.input.LocationInput;
 import com.flumen.backend.services.ItemService;
 
 import java.util.List;
-import java.util.Map;
 
 @RestController
 @RequestMapping("/api/items")

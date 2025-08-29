@@ -6,8 +6,6 @@ import org.springframework.web.bind.annotation.*;
 import com.flumen.backend.models.input.ConnectionInput;
 import com.flumen.backend.services.ConnectedToService;
 
-import java.util.List;
-
 @RestController
 @RequestMapping("/api/connections")
 public class LocationConnectionController {
