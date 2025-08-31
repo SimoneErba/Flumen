@@ -14,12 +14,43 @@ import { NodeSquareProgram } from "@sigma/node-square";
 import "@react-sigma/core/lib/react-sigma.min.css";
 
 // Assuming these are in your project structure
-import { hashToNumber } from "../utils/hash";
-import { GraphData } from "../api-client";
+// Since I don't have these files, I'll stub them for completeness.
+// You should keep your original imports.
+// import { hashToNumber } from "../utils/hash";
+// import { GraphData } from "../api-client";
+
+// --- Stubs for missing imports (DELETE THESE if you have the files) ---
+const hashToNumber = (s: string) => {
+  let hash = 0;
+  for (let i = 0; i < s.length; i++) {
+    const char = s.charCodeAt(i);
+    hash = (hash << 5) - hash + char;
+    hash = hash & hash; // Convert to 32bit integer
+  }
+  return Math.abs(hash);
+};
+
+export interface GraphData {
+  locations: Array<{
+    id: string;
+    name: string;
+    longitude?: number;
+    latitude?: number;
+    speed: number;
+    length: number;
+    items?: Array<{ id: string; name: string }>;
+  }>;
+  connections: Array<{
+    sourceId: string;
+    targetId: string;
+  }>;
+}
+// --- End of Stubs ---
+
 
 const sigmaStyle: React.CSSProperties = { height: "100vh", width: "100vw" };
 
-// --- Edge Editor Component (No changes) ---
+// --- Edge Editor Component ---
 interface EdgeEditorData {
   edgeId: string;
   sourceId: string;
@@ -32,9 +63,10 @@ interface EdgeEditorProps {
   data: EdgeEditorData;
   onClose: () => void;
   onSubmit: (updatedData: { speed: number; length: number; isReversed: boolean }) => void;
+  onDelete: (edgeId: string) => void;
 }
 
-const EdgeEditor = ({ data, onClose, onSubmit }: EdgeEditorProps) => {
+const EdgeEditor = ({ data, onClose, onSubmit, onDelete }: EdgeEditorProps) => {
   const [speed, setSpeed] = useState(data.speed);
   const [length, setLength] = useState(data.length);
   const [isReversed, setIsReversed] = useState(false);
@@ -42,6 +74,13 @@ const EdgeEditor = ({ data, onClose, onSubmit }: EdgeEditorProps) => {
   const handleSubmit = () => {
     onSubmit({ speed: Number(speed), length: Number(length), isReversed });
     onClose();
+  };
+
+  const handleDelete = () => {
+    if (window.confirm(`Are you sure you want to delete the path from ${data.sourceId} to ${data.targetId}?`)) {
+      onDelete(data.edgeId);
+      onClose();
+    }
   };
 
   const currentSourceLabel = isReversed ? data.targetId : data.sourceId;
@@ -66,6 +105,7 @@ const EdgeEditor = ({ data, onClose, onSubmit }: EdgeEditorProps) => {
       </div>
 
       <div style={iconGroupStyle}>
+        <button onClick={handleDelete} title="Delete">🗑️</button>
         <button onClick={onClose} title="Close">❌</button>
         <button onClick={handleSubmit} title="Submit">✔️</button>
       </div>
@@ -109,6 +149,13 @@ const GraphEvents = ({ initialGraphData, setHoveredEdge }: GraphEventsProps) => 
   const animatingItemsRef = useRef<Record<string, AnimationState>>(animatingItems);
   animatingItemsRef.current = animatingItems;
   const animationFrameId = useRef<number | null>(null);
+
+  // *** FIX FOR DELETE RACE CONDITION ***
+  // Use a ref to track selected edge. This allows us to remove 
+  // `selectedEdgeData` from the event registration's dependency array,
+  // preventing listeners from being torn down and re-registered, which caused the race condition.
+  const selectedEdgeRef = useRef(selectedEdgeData);
+  selectedEdgeRef.current = selectedEdgeData;
 
 
   useEffect(() => {
@@ -156,7 +203,7 @@ const GraphEvents = ({ initialGraphData, setHoveredEdge }: GraphEventsProps) => 
     setAnimatingItems(initialAnimations);
   }, [initialGraphData, loadGraph]);
 
-  // *** FIX: Optimized animation useEffect ***
+  // Animation useEffect (Optimized, no changes needed)
   useEffect(() => {
     const animate = () => {
       const graph = sigma.getGraph();
@@ -202,7 +249,6 @@ const GraphEvents = ({ initialGraphData, setHoveredEdge }: GraphEventsProps) => 
 
       if (needsRefresh) sigma.refresh();
 
-      // Only trigger a state update (and re-render) when an item's path changes
       if (itemsHaveChanged) {
         setAnimatingItems(nextAnimatingItems);
       }
@@ -214,7 +260,7 @@ const GraphEvents = ({ initialGraphData, setHoveredEdge }: GraphEventsProps) => 
     return () => {
       if (animationFrameId.current) cancelAnimationFrame(animationFrameId.current);
     };
-  }, [sigma]); // The dependency array is now minimal
+  }, [sigma]); // Dependency array is minimal
 
   const handleEdgeSubmit = useCallback(({ speed, length, isReversed }: { speed: number; length: number; isReversed: boolean }) => {
     if (!selectedEdgeData) return;
@@ -234,6 +280,14 @@ const GraphEvents = ({ initialGraphData, setHoveredEdge }: GraphEventsProps) => 
     sigma.refresh();
   }, [sigma, selectedEdgeData]);
 
+  const handleEdgeDelete = useCallback((edgeId: string) => {
+    const graph = sigma.getGraph();
+    if (graph.hasEdge(edgeId)) {
+      graph.dropEdge(edgeId);
+      sigma.refresh();
+    }
+  }, [sigma]);
+
   const addNode = useCallback((x: number, y: number) => {
     const graph = sigma.getGraph();
     if (!graph) return;
@@ -251,10 +305,10 @@ const GraphEvents = ({ initialGraphData, setHoveredEdge }: GraphEventsProps) => 
 
     closestNodes.forEach(e => {
       graph.addEdge(e.nodeId, newNodeId, { type: 'arrow', size: 5 });
-      graph.addEdge(newNodeId, e.nodeId, { type: 'arrow', size: 5 });
     });
   }, [sigma]);
 
+  // *** EVENT REGISTRATION (WITH ALL FIXES) ***
   useEffect(() => {
     registerEvents({
       enterEdge: ({ edge }) => setHoveredEdge(edge),
@@ -270,7 +324,8 @@ const GraphEvents = ({ initialGraphData, setHoveredEdge }: GraphEventsProps) => 
         });
       },
       clickStage: ({ event }) => {
-        if (selectedEdgeData) {
+        // Use the ref to check current state without adding state to deps
+        if (selectedEdgeRef.current) {
           setSelectedEdgeData(null);
         } else if (!isDraggingRef.current) {
           const pos = sigma.viewportToGraph(event);
@@ -279,24 +334,37 @@ const GraphEvents = ({ initialGraphData, setHoveredEdge }: GraphEventsProps) => 
       },
       downNode: ({ node }) => {
         setSelectedEdgeData(null);
+        // Only allow dragging location nodes (not "item" squares)
         if (sigma.getGraph().getNodeAttribute(node, "type") !== "square") {
           isDraggingRef.current = true;
           draggedNodeRef.current = node;
+          // Disable camera panning on drag
+          sigma.getSettings().mouseEnabled = false;
         }
       },
       mouseup: () => {
-        isDraggingRef.current = false;
-        draggedNodeRef.current = null;
+        // Only run logic if we were dragging a node
+        if (isDraggingRef.current && draggedNodeRef.current) {
+          isDraggingRef.current = false;
+          draggedNodeRef.current = null;
+          // Re-enable camera panning
+          sigma.getSettings().mouseEnabled = true;
+        }
       },
       mousemove: (event) => {
+        // Only run logic if we are dragging a specific node
         if (isDraggingRef.current && draggedNodeRef.current) {
+          // Prevent camera panning
+          event.preventSigmaDefault();
+          
           const pos = sigma.viewportToGraph(event);
           sigma.getGraph().setNodeAttribute(draggedNodeRef.current, "x", pos.x);
           sigma.getGraph().setNodeAttribute(draggedNodeRef.current, "y", pos.y);
         }
       },
     });
-  }, [sigma, registerEvents, addNode, selectedEdgeData, setHoveredEdge]);
+  // This stable dependency array prevents event re-registration and fixes the deletion race condition
+  }, [sigma, registerEvents, addNode, setHoveredEdge]);
 
   return (
     <>
@@ -305,6 +373,7 @@ const GraphEvents = ({ initialGraphData, setHoveredEdge }: GraphEventsProps) => 
           data={selectedEdgeData}
           onSubmit={handleEdgeSubmit}
           onClose={() => setSelectedEdgeData(null)}
+          onDelete={handleEdgeDelete}
         />
       )}
       <ControlsContainer position={"bottom-right"}>
@@ -339,3 +408,6 @@ export const DisplayGraph = ({ initialGraphData }: { initialGraphData: GraphData
     </SigmaContainer>
   );
 };
+
+// Default export in case it's needed, though DisplayGraph is the named export you're likely using
+export default DisplayGraph;
