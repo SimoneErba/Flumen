@@ -5,13 +5,8 @@ import { useGraph } from './hooks/useGraph';
 function App() {
   const { graphData, loading } = useGraph();
   return (
-    loading ? <div>Loading...</div> : <div style={{
-      width: '100vw',
-      height: '100vh'
-    }}>
-      
+    loading ? <div>Loading...</div> : 
       <DisplayGraph initialGraphData={graphData} />
-    </div>
   );
 }
 

@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useRef, useCallback } from "react";
+import * as graphologyMetrics from "graphology-metrics"; // This is correct
 import {
   SigmaContainer,
   useSigma,
@@ -7,19 +8,12 @@ import {
   ZoomControl,
   FullScreenControl,
   EdgeReducer,
-  useRegisterEvents,
+  useRegisterEvents
 } from "@react-sigma/core";
 import { MultiDirectedGraph } from "graphology";
 import { NodeSquareProgram } from "@sigma/node-square";
 import "@react-sigma/core/lib/react-sigma.min.css";
 
-// Assuming these are in your project structure
-// Since I don't have these files, I'll stub them for completeness.
-// You should keep your original imports.
-// import { hashToNumber } from "../utils/hash";
-// import { GraphData } from "../api-client";
-
-// --- Stubs for missing imports (DELETE THESE if you have the files) ---
 const hashToNumber = (s: string) => {
   let hash = 0;
   for (let i = 0; i < s.length; i++) {
@@ -50,6 +44,7 @@ export interface GraphData {
 
 const sigmaStyle: React.CSSProperties = { height: "100vh", width: "100vw" };
 
+// --- Edge Editor Component ---
 // --- Edge Editor Component ---
 interface EdgeEditorData {
   edgeId: string;
@@ -116,7 +111,7 @@ const EdgeEditor = ({ data, onClose, onSubmit, onDelete }: EdgeEditorProps) => {
 const editorStyle: React.CSSProperties = {
   position: 'absolute', top: '10px', right: '10px', background: 'white',
   padding: '10px', border: '1px solid #ccc', borderRadius: '8px',
-  boxShadow: '0 2px 10px rgba(0,0,0,0.1)', zIndex: 100,
+  boxShadow: '0 2px 10px rgba(0,0,0,0.1)', zIndex: 110, // Increased z-index
   display: 'flex', flexDirection: 'column', gap: '8px'
 };
 const buttonGroupStyle: React.CSSProperties = { display: 'flex', justifyContent: 'center', marginTop: '10px' };
@@ -128,6 +123,14 @@ interface AnimationState {
   targetId: string;
   startTime: number;
   duration: number;
+}
+
+// *** NEW ***: Interface for the visual feedback line's coordinates
+interface LineCoordinates {
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
 }
 
 interface GraphEventsProps {
@@ -144,23 +147,22 @@ const GraphEvents = ({ initialGraphData, setHoveredEdge }: GraphEventsProps) => 
   const isDraggingRef = useRef<boolean>(false);
   const [selectedEdgeData, setSelectedEdgeData] = useState<EdgeEditorData | null>(null);
   
-  // State and Ref for the animation
   const [animatingItems, setAnimatingItems] = useState<Record<string, AnimationState>>({});
   const animatingItemsRef = useRef<Record<string, AnimationState>>(animatingItems);
   animatingItemsRef.current = animatingItems;
   const animationFrameId = useRef<number | null>(null);
 
-  // *** FIX FOR DELETE RACE CONDITION ***
-  // Use a ref to track selected edge. This allows us to remove 
-  // `selectedEdgeData` from the event registration's dependency array,
-  // preventing listeners from being torn down and re-registered, which caused the race condition.
   const selectedEdgeRef = useRef(selectedEdgeData);
   selectedEdgeRef.current = selectedEdgeData;
+  
+  // *** NEW ***: State and refs for adding a new edge
+  const [lineCoordinates, setLineCoordinates] = useState<LineCoordinates | null>(null);
+  const isAddingEdgeRef = useRef<boolean>(false);
+  const edgeSourceNodeRef = useRef<string | null>(null);
 
 
   useEffect(() => {
     const graph = new MultiDirectedGraph();
-    // Graph loading logic
     initialGraphData.locations.forEach(location => {
       graph.addNode(location.id, {
         x: location.longitude ?? hashToNumber(location.id),
@@ -185,8 +187,6 @@ const GraphEvents = ({ initialGraphData, setHoveredEdge }: GraphEventsProps) => 
       }
     });
     loadGraph(graph);
-
-    // Initial animation setup
     const initialAnimations: Record<string, AnimationState> = {};
     graph.forEachNode((node, attrs) => {
       if (attrs.type === "square") {
@@ -203,7 +203,6 @@ const GraphEvents = ({ initialGraphData, setHoveredEdge }: GraphEventsProps) => 
     setAnimatingItems(initialAnimations);
   }, [initialGraphData, loadGraph]);
 
-  // Animation useEffect (Optimized, no changes needed)
   useEffect(() => {
     const animate = () => {
       const graph = sigma.getGraph();
@@ -211,32 +210,26 @@ const GraphEvents = ({ initialGraphData, setHoveredEdge }: GraphEventsProps) => 
         animationFrameId.current = requestAnimationFrame(animate);
         return;
       }
-      
       const currentTime = Date.now();
       let needsRefresh = false;
       let itemsHaveChanged = false;
       const nextAnimatingItems = { ...animatingItemsRef.current };
-
       for (const itemId in animatingItemsRef.current) {
         if (itemId === draggedNodeRef.current) continue;
-
         const anim = animatingItemsRef.current[itemId];
         const sourceNode = graph.getNodeAttributes(anim.sourceId);
         const targetNode = graph.getNodeAttributes(anim.targetId);
         if (!sourceNode || !targetNode) continue;
-
         const progress = Math.min((currentTime - anim.startTime) / anim.duration, 1);
         graph.setNodeAttribute(itemId, "x", sourceNode.x + (targetNode.x - sourceNode.x) * progress);
         graph.setNodeAttribute(itemId, "y", sourceNode.y + (targetNode.y - sourceNode.y) * progress);
         needsRefresh = true;
-
         if (progress >= 1) {
           itemsHaveChanged = true;
           const newSourceId = anim.targetId;
           const newSourceLocationAttrs = graph.getNodeAttributes(newSourceId);
           const nextPossibleTargets = graph.outEdges(newSourceId).map(edge => graph.target(edge));
           const uniqueNextTargets = [...new Set(nextPossibleTargets)];
-
           if (uniqueNextTargets.length === 1 && newSourceLocationAttrs && newSourceLocationAttrs.speed > 0) {
             const newTargetId = uniqueNextTargets[0];
             const duration = (newSourceLocationAttrs.length / newSourceLocationAttrs.speed) * 1000;
@@ -246,31 +239,25 @@ const GraphEvents = ({ initialGraphData, setHoveredEdge }: GraphEventsProps) => 
           }
         }
       }
-
       if (needsRefresh) sigma.refresh();
-
       if (itemsHaveChanged) {
         setAnimatingItems(nextAnimatingItems);
       }
-      
       animationFrameId.current = requestAnimationFrame(animate);
     };
-
     animationFrameId.current = requestAnimationFrame(animate);
     return () => {
       if (animationFrameId.current) cancelAnimationFrame(animationFrameId.current);
     };
-  }, [sigma]); // Dependency array is minimal
+  }, [sigma]);
 
   const handleEdgeSubmit = useCallback(({ speed, length, isReversed }: { speed: number; length: number; isReversed: boolean }) => {
     if (!selectedEdgeData) return;
     const graph = sigma.getGraph();
     const { sourceId, targetId, edgeId } = selectedEdgeData;
     const sourceOfEdit = isReversed ? targetId : sourceId;
-    
     graph.setNodeAttribute(sourceOfEdit, 'speed', speed);
     graph.setNodeAttribute(sourceOfEdit, 'length', length);
-
     if (isReversed) {
       if (graph.hasEdge(edgeId)) {
         graph.dropEdge(edgeId);
@@ -300,21 +287,22 @@ const GraphEvents = ({ initialGraphData, setHoveredEdge }: GraphEventsProps) => 
       })
       .sort((a, b) => a.distance - b.distance)
       .slice(0, 2);
-
     graph.addNode(newNodeId, { x, y, label: "New Location", size: 10, color: "#69b3a2", speed: 10, length: 50 });
-
     closestNodes.forEach(e => {
       graph.addEdge(e.nodeId, newNodeId, { type: 'arrow', size: 5 });
+      // To make it bidirectional by default, add the reverse edge too
+      // graph.addEdge(newNodeId, e.nodeId, { type: 'arrow', size: 5 });
     });
   }, [sigma]);
 
-  // *** EVENT REGISTRATION (WITH ALL FIXES) ***
+  // *** MODIFIED ***: EVENT REGISTRATION (WITH ALT+DRAG FOR EDGES)
   useEffect(() => {
     registerEvents({
       enterEdge: ({ edge }) => setHoveredEdge(edge),
       leaveEdge: () => setHoveredEdge(null),
       clickEdge: ({ edge }) => {
         const graph = sigma.getGraph();
+        if (!graph.hasEdge(edge)) return;
         const sourceId = graph.source(edge);
         const targetId = graph.target(edge);
         const sourceAttrs = graph.getNodeAttributes(sourceId);
@@ -324,7 +312,6 @@ const GraphEvents = ({ initialGraphData, setHoveredEdge }: GraphEventsProps) => 
         });
       },
       clickStage: ({ event }) => {
-        // Use the ref to check current state without adding state to deps
         if (selectedEdgeRef.current) {
           setSelectedEdgeData(null);
         } else if (!isDraggingRef.current) {
@@ -332,42 +319,108 @@ const GraphEvents = ({ initialGraphData, setHoveredEdge }: GraphEventsProps) => 
           addNode(pos.x, pos.y);
         }
       },
-      downNode: ({ node }) => {
-        setSelectedEdgeData(null);
-        // Only allow dragging location nodes (not "item" squares)
-        if (sigma.getGraph().getNodeAttribute(node, "type") !== "square") {
-          isDraggingRef.current = true;
-          draggedNodeRef.current = node;
-          // Disable camera panning on drag
-          sigma.getSettings().mouseEnabled = false;
+      downNode: ({ node, event }) => {
+        // Check for Alt key to decide action
+        if (event.original.altKey) {
+          // --- STARTING TO ADD AN EDGE ---
+          event.preventSigmaDefault();
+          isAddingEdgeRef.current = true;
+          edgeSourceNodeRef.current = node;
+          const nodeDisplayData = sigma.getNodeDisplayData(node);
+          if (nodeDisplayData) {
+            setLineCoordinates({
+              x1: nodeDisplayData.x, y1: nodeDisplayData.y,
+              x2: nodeDisplayData.x, y2: nodeDisplayData.y,
+            });
+          }
+        } else {
+          // --- STARTING TO MOVE A NODE (existing logic) ---
+          setSelectedEdgeData(null);
+          if (sigma.getGraph().getNodeAttribute(node, "type") !== "square") {
+            isDraggingRef.current = true;
+            draggedNodeRef.current = node;
+            sigma.getSettings().mouseEnabled = false;
+          }
+        }
+      },
+      upNode: ({ node }) => {
+        // Check if we were in "add edge" mode and dropped on a different, valid node
+        if (isAddingEdgeRef.current && edgeSourceNodeRef.current && edgeSourceNodeRef.current !== node) {
+          const graph = sigma.getGraph();
+          const source = edgeSourceNodeRef.current;
+          const target = node;
+          if (!graph.hasEdge(source, target)) {
+            graph.addEdge(source, target, { type: 'arrow', size: 5 });
+          }
         }
       },
       mouseup: () => {
-        // Only run logic if we were dragging a node
-        if (isDraggingRef.current && draggedNodeRef.current) {
+        // --- CLEANUP FOR ALL ACTIONS ---
+        if (isAddingEdgeRef.current) {
+          isAddingEdgeRef.current = false;
+          edgeSourceNodeRef.current = null;
+          setLineCoordinates(null); // Hide the feedback line
+        }
+        if (isDraggingRef.current) {
           isDraggingRef.current = false;
           draggedNodeRef.current = null;
-          // Re-enable camera panning
           sigma.getSettings().mouseEnabled = true;
         }
       },
       mousemove: (event) => {
-        // Only run logic if we are dragging a specific node
+        // Handle moving a node (this part is fine)
         if (isDraggingRef.current && draggedNodeRef.current) {
-          // Prevent camera panning
           event.preventSigmaDefault();
-          
           const pos = sigma.viewportToGraph(event);
           sigma.getGraph().setNodeAttribute(draggedNodeRef.current, "x", pos.x);
           sigma.getGraph().setNodeAttribute(draggedNodeRef.current, "y", pos.y);
+          return; // Exit early
+        }
+
+        // Handle drawing the edge line
+        if (isAddingEdgeRef.current && edgeSourceNodeRef.current) {
+          event.preventSigmaDefault();
+           // Get the source node's *current* position from sigma, not from a stale state
+          const sourceNodeDisplayData = sigma.getNodeDisplayData(edgeSourceNodeRef.current);
+          if (!sourceNodeDisplayData) return;
+
+          // The 'event' object contains the current mouse coordinates
+          // No need to use a stale 'lineCoordinates' from a previous render
+          const { x: x2, y: y2 } = event; // These are viewport coordinates
+
+          setLineCoordinates({
+            x1: sourceNodeDisplayData.x,
+            y1: sourceNodeDisplayData.y,
+            x2: x2, // Use live coordinate from the event
+            y2: y2, // Use live coordinate from the event
+          });
         }
       },
     });
-  // This stable dependency array prevents event re-registration and fixes the deletion race condition
+  // This stable dependency array is key to preventing bugs
   }, [sigma, registerEvents, addNode, setHoveredEdge]);
 
   return (
     <>
+      {/* *** NEW ***: SVG Overlay for visual feedback when adding an edge */}
+      <svg
+        style={{
+          position: 'absolute', top: 0, left: 0,
+          width: '100%', height: '100%',
+          pointerEvents: 'none', // Allows clicks to pass through to the graph
+          zIndex: 100,
+        }}
+      >
+        {lineCoordinates && (
+          <line
+            x1={lineCoordinates.x1} y1={lineCoordinates.y1}
+            x2={lineCoordinates.x2} y2={lineCoordinates.y2}
+            stroke="#ff5500" strokeWidth="2"
+          />
+        )}
+      </svg>
+      {console.log(lineCoordinates)}
+    
       {selectedEdgeData && (
         <EdgeEditor
           data={selectedEdgeData}
@@ -396,18 +449,20 @@ export const DisplayGraph = ({ initialGraphData }: { initialGraphData: GraphData
   }, [hoveredEdge]);
 
   return (
+    <div style={{ width: '100%', height: '100vh', position: 'relative' }}>
     <SigmaContainer
       style={{ ...sigmaStyle, cursor: hoveredEdge ? 'pointer' : 'default' }}
       settings={{
         nodeProgramClasses: { square: NodeSquareProgram },
         enableEdgeEvents: true,
+        autoRescale: true
       }}
       edgeReducer={edgeReducer}
     >
       <GraphEvents initialGraphData={initialGraphData} setHoveredEdge={setHoveredEdge} />
     </SigmaContainer>
+    </div>
   );
 };
 
-// Default export in case it's needed, though DisplayGraph is the named export you're likely using
 export default DisplayGraph;
