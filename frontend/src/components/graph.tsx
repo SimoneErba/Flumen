@@ -159,7 +159,7 @@ const GraphEvents = ({ initialGraphData, setHoveredEdge }: GraphEventsProps) => 
   const [lineCoordinates, setLineCoordinates] = useState<LineCoordinates | null>(null);
   const isAddingEdgeRef = useRef<boolean>(false);
   const edgeSourceNodeRef = useRef<string | null>(null);
-
+  const wasAddingEdgeRef = useRef<boolean>(false);
 
   useEffect(() => {
     const graph = new MultiDirectedGraph();
@@ -312,6 +312,10 @@ const GraphEvents = ({ initialGraphData, setHoveredEdge }: GraphEventsProps) => 
         });
       },
       clickStage: ({ event }) => {
+        if (wasAddingEdgeRef.current) {
+          wasAddingEdgeRef.current = false;
+          return; // Don't add a node if we were just adding an edge
+        }
         if (selectedEdgeRef.current) {
           setSelectedEdgeData(null);
         } else if (!isDraggingRef.current) {
@@ -323,14 +327,16 @@ const GraphEvents = ({ initialGraphData, setHoveredEdge }: GraphEventsProps) => 
         // Check for Alt key to decide action
         if (event.original.altKey) {
           // --- STARTING TO ADD AN EDGE ---
+          wasAddingEdgeRef.current = true; 
           event.preventSigmaDefault();
           isAddingEdgeRef.current = true;
+          wasAddingEdgeRef.current = true; 
           edgeSourceNodeRef.current = node;
           const nodeDisplayData = sigma.getNodeDisplayData(node);
           if (nodeDisplayData) {
             setLineCoordinates({
-              x1: nodeDisplayData.x, y1: nodeDisplayData.y,
-              x2: nodeDisplayData.x, y2: nodeDisplayData.y,
+              x1: event.x, y1: event.y,
+              x2: event.x, y2: event.y,
             });
           }
         } else {
@@ -380,19 +386,17 @@ const GraphEvents = ({ initialGraphData, setHoveredEdge }: GraphEventsProps) => 
         // Handle drawing the edge line
         if (isAddingEdgeRef.current && edgeSourceNodeRef.current) {
           event.preventSigmaDefault();
-           // Get the source node's *current* position from sigma, not from a stale state
-          const sourceNodeDisplayData = sigma.getNodeDisplayData(edgeSourceNodeRef.current);
-          if (!sourceNodeDisplayData) return;
 
-          // The 'event' object contains the current mouse coordinates
-          // No need to use a stale 'lineCoordinates' from a previous render
-          const { x: x2, y: y2 } = event; // These are viewport coordinates
+          setLineCoordinates(coords => {
+            if (!coords) return null;
 
-          setLineCoordinates({
-            x1: sourceNodeDisplayData.x,
-            y1: sourceNodeDisplayData.y,
-            x2: x2, // Use live coordinate from the event
-            y2: y2, // Use live coordinate from the event
+            console.log("coordsv", coords, event.x, event.y)
+
+            return {
+              ...coords,
+              x2: event.x,
+              y2: event.y,
+            };
           });
         }
       },
