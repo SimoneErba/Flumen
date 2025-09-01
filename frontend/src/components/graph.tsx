@@ -39,12 +39,68 @@ export interface GraphData {
     targetId: string;
   }>;
 }
-// --- End of Stubs ---
 
+interface NodeEditorData {
+  nodeId: string;
+  name: string;
+}
+
+interface NodeEditorProps {
+  data: NodeEditorData;
+  onClose: () => void;
+  onSubmit: (updatedData: { name: string }) => void;
+  onDelete: (nodeId: string) => void;
+}
+
+const NodeEditor = ({ data, onClose, onSubmit, onDelete }: NodeEditorProps) => {
+  const [name, setName] = useState(data.name);
+
+  const handleSubmit = () => {
+    if (name.trim()) {
+      onSubmit({ name: name.trim() });
+      onClose();
+    }
+  };
+
+  const handleDelete = () => {
+    if (window.confirm(`Are you sure you want to delete "${data.name}"?`)) {
+      onDelete(data.nodeId);
+      onClose();
+    }
+  };
+
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handleSubmit();
+    } else if (e.key === 'Escape') {
+      onClose();
+    }
+  };
+
+  return (
+    <div style={editorStyle}>
+      <h4>Edit Location</h4>
+      
+      <label>Name:</label>
+      <input 
+        type="text" 
+        value={name} 
+        onChange={e => setName(e.target.value)}
+        onKeyPress={handleKeyPress}
+        autoFocus
+      />
+
+      <div style={iconGroupStyle}>
+        <button onClick={handleDelete} title="Delete">🗑️</button>
+        <button onClick={onClose} title="Close">❌</button>
+        <button onClick={handleSubmit} title="Submit">✔️</button>
+      </div>
+    </div>
+  );
+};
 
 const sigmaStyle: React.CSSProperties = { height: "100vh", width: "100vw" };
 
-// --- Edge Editor Component ---
 // --- Edge Editor Component ---
 interface EdgeEditorData {
   edgeId: string;
@@ -146,15 +202,19 @@ const GraphEvents = ({ initialGraphData, setHoveredEdge }: GraphEventsProps) => 
   const draggedNodeRef = useRef<string | null>(null);
   const isDraggingRef = useRef<boolean>(false);
   const [selectedEdgeData, setSelectedEdgeData] = useState<EdgeEditorData | null>(null);
-  
+  const [selectedNodeData, setSelectedNodeData] = useState<NodeEditorData | null>(null);
+
   const [animatingItems, setAnimatingItems] = useState<Record<string, AnimationState>>({});
   const animatingItemsRef = useRef<Record<string, AnimationState>>(animatingItems);
   animatingItemsRef.current = animatingItems;
   const animationFrameId = useRef<number | null>(null);
 
+  // In the events we cant access states becuase of closures (state have the value of whne the event handler is instatiated), so we need to use refs
   const selectedEdgeRef = useRef(selectedEdgeData);
+  const selectedNodeRef = useRef(selectedNodeData);
+
   selectedEdgeRef.current = selectedEdgeData;
-  
+  selectedNodeRef.current = selectedNodeData;
   // *** NEW ***: State and refs for adding a new edge
   const [lineCoordinates, setLineCoordinates] = useState<LineCoordinates | null>(null);
   const isAddingEdgeRef = useRef<boolean>(false);
@@ -267,10 +327,27 @@ const GraphEvents = ({ initialGraphData, setHoveredEdge }: GraphEventsProps) => 
     sigma.refresh();
   }, [sigma, selectedEdgeData]);
 
+  const handleNodeSubmit = useCallback(({ name }: { name: string }) => {
+    if (!selectedNodeData) return;
+    const graph = sigma.getGraph();
+    const { nodeId } = selectedNodeData;
+    graph.setNodeAttribute(nodeId, 'label', name);
+    
+    sigma.refresh();
+  }, [sigma, selectedNodeData]);
+
   const handleEdgeDelete = useCallback((edgeId: string) => {
     const graph = sigma.getGraph();
     if (graph.hasEdge(edgeId)) {
       graph.dropEdge(edgeId);
+      sigma.refresh();
+    }
+  }, [sigma]);
+
+  const handleNodeDelete = useCallback((nodeId: string) => {
+    const graph = sigma.getGraph();
+    if (graph.hasNode(nodeId)) {
+      graph.dropNode(nodeId);
       sigma.refresh();
     }
   }, [sigma]);
@@ -312,6 +389,10 @@ const GraphEvents = ({ initialGraphData, setHoveredEdge }: GraphEventsProps) => 
         });
       },
       clickStage: ({ event }) => {
+        if (selectedNodeRef.current){
+          setSelectedNodeData(null);
+          return;
+        }
         if (wasAddingEdgeRef.current) {
           wasAddingEdgeRef.current = false;
           return; // Don't add a node if we were just adding an edge
@@ -400,6 +481,11 @@ const GraphEvents = ({ initialGraphData, setHoveredEdge }: GraphEventsProps) => 
           });
         }
       },
+      clickNode: ({ node }) => {
+        const graph = sigma.getGraph();
+        const attr = graph.getNodeAttributes(node)
+        setSelectedNodeData({nodeId: node, name: attr.label})
+      }
     });
   // This stable dependency array is key to preventing bugs
   }, [sigma, registerEvents, addNode, setHoveredEdge]);
@@ -423,7 +509,6 @@ const GraphEvents = ({ initialGraphData, setHoveredEdge }: GraphEventsProps) => 
           />
         )}
       </svg>
-      {console.log(lineCoordinates)}
     
       {selectedEdgeData && (
         <EdgeEditor
@@ -431,6 +516,14 @@ const GraphEvents = ({ initialGraphData, setHoveredEdge }: GraphEventsProps) => 
           onSubmit={handleEdgeSubmit}
           onClose={() => setSelectedEdgeData(null)}
           onDelete={handleEdgeDelete}
+        />
+      )}
+      {selectedNodeData && (
+        <NodeEditor
+          data={selectedNodeData}
+          onSubmit={handleNodeSubmit}
+          onClose={() => setSelectedNodeData(null)}
+          onDelete={handleNodeDelete}
         />
       )}
       <ControlsContainer position={"bottom-right"}>
