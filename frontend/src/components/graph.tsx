@@ -1,5 +1,4 @@
 import React, { useEffect, useState, useRef, useCallback } from "react";
-import * as graphologyMetrics from "graphology-metrics"; // This is correct
 import {
   SigmaContainer,
   useSigma,
@@ -19,7 +18,7 @@ const hashToNumber = (s: string) => {
   for (let i = 0; i < s.length; i++) {
     const char = s.charCodeAt(i);
     hash = (hash << 5) - hash + char;
-    hash = hash & hash; // Convert to 32bit integer
+    hash = hash & hash;
   }
   return Math.abs(hash);
 };
@@ -79,7 +78,7 @@ const NodeEditor = ({ data, onClose, onSubmit, onDelete }: NodeEditorProps) => {
 
   return (
     <div style={editorStyle}>
-      <h4>Edit Location</h4>
+      <h4>Edit Node</h4>
       
       <label>Name:</label>
       <input 
@@ -181,7 +180,7 @@ interface AnimationState {
   duration: number;
 }
 
-// *** NEW ***: Interface for the visual feedback line's coordinates
+// Interface for the visual feedback line's coordinates
 interface LineCoordinates {
   x1: number;
   y1: number;
@@ -215,7 +214,7 @@ const GraphEvents = ({ initialGraphData, setHoveredEdge }: GraphEventsProps) => 
 
   selectedEdgeRef.current = selectedEdgeData;
   selectedNodeRef.current = selectedNodeData;
-  // *** NEW ***: State and refs for adding a new edge
+
   const [lineCoordinates, setLineCoordinates] = useState<LineCoordinates | null>(null);
   const isAddingEdgeRef = useRef<boolean>(false);
   const edgeSourceNodeRef = useRef<string | null>(null);
@@ -411,7 +410,6 @@ const GraphEvents = ({ initialGraphData, setHoveredEdge }: GraphEventsProps) => 
           wasAddingEdgeRef.current = true; 
           event.preventSigmaDefault();
           isAddingEdgeRef.current = true;
-          wasAddingEdgeRef.current = true; 
           edgeSourceNodeRef.current = node;
           const nodeDisplayData = sigma.getNodeDisplayData(node);
           if (nodeDisplayData) {
@@ -470,9 +468,6 @@ const GraphEvents = ({ initialGraphData, setHoveredEdge }: GraphEventsProps) => 
 
           setLineCoordinates(coords => {
             if (!coords) return null;
-
-            console.log("coordsv", coords, event.x, event.y)
-
             return {
               ...coords,
               x2: event.x,
