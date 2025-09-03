@@ -181,13 +181,8 @@ public class ItemService {
 
     public void deleteItem(String id) {
         try (ODatabaseSession db = orientDBService.getSession()) {
-            ORID theRid = new ORecordId(id);
-            OVertex vertex = db.load(theRid);
-            if (vertex != null) {
-                vertex.delete();
-            } else {
-                throw new IllegalArgumentException("Item with ID: " + id + " not found for deletion.");
-            }
+            OVertex toLocationVertex = OrientDBUtils.loadAndValidateVertexByCustomId(db, id);
+            toLocationVertex.delete();
         } catch (Exception e) {
             throw new RuntimeException("Error while deleting item with ID " + id + ": " + e.getMessage(), e);
         }

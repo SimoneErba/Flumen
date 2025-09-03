@@ -216,7 +216,8 @@ const GraphEvents = ({ initialGraphData, setHoveredEdge }: GraphEventsProps) => 
   const isDraggingRef = useRef<boolean>(false);
   const [selectedEdgeData, setSelectedEdgeData] = useState<EdgeEditorData | null>(null);
   const [selectedNodeData, setSelectedNodeData] = useState<NodeEditorData | null>(null);
-
+  const didMoveRef = useRef<boolean>(false);
+  
   const [animatingItems, setAnimatingItems] = useState<Record<string, AnimationState>>({});
   const animatingItemsRef = useRef(animatingItems);
   animatingItemsRef.current = animatingItems;
@@ -417,7 +418,7 @@ const GraphEvents = ({ initialGraphData, setHoveredEdge }: GraphEventsProps) => 
 
       // API Call
       try {
-          await locationApi.deleteLocation(id);
+          await locationApi.deleteLocation(nodeId);
       } catch (error) {
           console.error("Failed to delete node:", error);
           // TODO: Re-add node to graph and show error
@@ -520,6 +521,7 @@ const GraphEvents = ({ initialGraphData, setHoveredEdge }: GraphEventsProps) => 
         }
       },
       downNode: ({ node, event }) => {
+        didMoveRef.current = false;
         if (event.original.altKey) {
           wasAddingEdgeRef.current = true; 
           event.preventSigmaDefault();
@@ -582,6 +584,10 @@ const GraphEvents = ({ initialGraphData, setHoveredEdge }: GraphEventsProps) => 
         }
       },
       mousemove: (event) => {
+        if (isDraggingRef.current || isAddingEdgeRef.current) {
+          didMoveRef.current = true;
+        }
+
         if (isDraggingRef.current && draggedNodeRef.current) {
           event.preventSigmaDefault();
           const pos = sigma.viewportToGraph(event);
@@ -603,9 +609,14 @@ const GraphEvents = ({ initialGraphData, setHoveredEdge }: GraphEventsProps) => 
         }
       },
       clickNode: ({ node }) => {
-        const graph = sigma.getGraph();
-        const attr = graph.getNodeAttributes(node)
-        setSelectedNodeData({nodeId: node, name: attr.label})
+        if (didMoveRef.current) {
+          return;
+        }
+        if (!isAddingEdgeRef.current && !isDraggingRef.current){
+          const graph = sigma.getGraph();
+          const attr = graph.getNodeAttributes(node)
+          setSelectedNodeData({nodeId: node, name: attr.label})
+        }
       }
     });
   }, [sigma, registerEvents, addNode, setHoveredEdge, connectionApi, debouncedUpdateNodePosition]);

@@ -125,13 +125,8 @@ public class LocationService {
 
     public void deleteLocation(String id) {
         try (ODatabaseSession db = orientDBService.getSession()) {
-            ORID theRid = new ORecordId(id);
-            OVertex vertex = db.load(theRid);
-            if (vertex != null) {
-                vertex.delete();
-            } else {
-                throw new IllegalArgumentException("Location with ID: " + id + " not found for deletion.");
-            }
+            OVertex toLocationVertex = OrientDBUtils.loadAndValidateVertexByCustomId(db, id);
+            toLocationVertex.delete();
         } catch (Exception e) {
             throw new RuntimeException("Error while deleting location with ID " + id + ": " + e.getMessage(), e);
         }
