@@ -979,6 +979,49 @@ export const LocationConnectionControllerApiAxiosParamCreator = function (config
         },
         /**
          * 
+         * @param {string} sourceId 
+         * @param {string} targetId 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        deleteConnection: async (sourceId: string, targetId: string, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'sourceId' is not null or undefined
+            assertParamExists('deleteConnection', 'sourceId', sourceId)
+            // verify required parameter 'targetId' is not null or undefined
+            assertParamExists('deleteConnection', 'targetId', targetId)
+            const localVarPath = `/api/connections`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'DELETE', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            if (sourceId !== undefined) {
+                localVarQueryParameter['sourceId'] = sourceId;
+            }
+
+            if (targetId !== undefined) {
+                localVarQueryParameter['targetId'] = targetId;
+            }
+
+
+    
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 
          * @param {string} locationId 
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
@@ -1069,6 +1112,19 @@ export const LocationConnectionControllerApiFp = function(configuration?: Config
         },
         /**
          * 
+         * @param {string} sourceId 
+         * @param {string} targetId 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async deleteConnection(sourceId: string, targetId: string, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<void>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.deleteConnection(sourceId, targetId, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['LocationConnectionControllerApi.deleteConnection']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 
          * @param {string} locationId 
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
@@ -1112,6 +1168,16 @@ export const LocationConnectionControllerApiFactory = function (configuration?: 
         },
         /**
          * 
+         * @param {string} sourceId 
+         * @param {string} targetId 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        deleteConnection(sourceId: string, targetId: string, options?: RawAxiosRequestConfig): AxiosPromise<void> {
+            return localVarFp.deleteConnection(sourceId, targetId, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
          * @param {string} locationId 
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
@@ -1147,6 +1213,18 @@ export class LocationConnectionControllerApi extends BaseAPI {
      */
     public createConnection1(connectionInput: ConnectionInput, options?: RawAxiosRequestConfig) {
         return LocationConnectionControllerApiFp(this.configuration).createConnection1(connectionInput, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
+     * @param {string} sourceId 
+     * @param {string} targetId 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof LocationConnectionControllerApi
+     */
+    public deleteConnection(sourceId: string, targetId: string, options?: RawAxiosRequestConfig) {
+        return LocationConnectionControllerApiFp(this.configuration).deleteConnection(sourceId, targetId, options).then((request) => request(this.axios, this.basePath));
     }
 
     /**

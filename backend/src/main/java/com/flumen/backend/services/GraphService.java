@@ -46,12 +46,12 @@ public class GraphService {
                 while (rs.hasNext()) {
                     OVertex result = rs.next().toElement().asVertex().get();
                     LocationResponse location = new LocationResponse();
-                    location.setId(result.getIdentity().toString());
+                    location.setId(result.getProperty("customId"));
                     location.setName(result.getProperty("name"));
                     location.setLatitude(result.getProperty("latitude"));
                     location.setLongitude(result.getProperty("longitude"));
-                    location.setLength(result.getProperty("length"));
-                    location.setSpeed(result.getProperty("speed"));
+                    location.setLength(((Number) result.getProperty("length")).doubleValue());
+                    location.setSpeed(((Number) result.getProperty("speed")).doubleValue());
                     location.setActive(result.getProperty("active"));
                     
                     location.setProperties(result.getProperty("properties"));
@@ -62,7 +62,7 @@ public class GraphService {
                         List<ItemResponse> locationItems = itemResults.stream()
                             .map(itemResult -> {
                                 ItemResponse item = new ItemResponse();
-                                item.setId(itemResult.field("@rid").toString());
+                                item.setId(itemResult.field("customId"));
                                 item.setName(itemResult.field("name"));
                                 item.setSpeed(itemResult.field("speed"));
                                 item.setActive(itemResult.field("active"));
@@ -81,7 +81,7 @@ public class GraphService {
                         outResults.forEach(outResult -> {
                             ConnectionResponse conn = new ConnectionResponse();
                             conn.setSourceId(location.getId());
-                            conn.setTargetId(outResult.field("@rid").toString());
+                            conn.setTargetId(outResult.field("customId"));
                             conn.setDirection("out");
                         
                             conn.setProperties(outResult.field("properties"));
@@ -95,7 +95,7 @@ public class GraphService {
                     if (inResults != null) {
                         inResults.forEach(inResult -> {
                             ConnectionResponse conn = new ConnectionResponse();
-                            conn.setSourceId(inResult.field("@rid").toString());
+                            conn.setSourceId(inResult.field("customId"));
                             conn.setTargetId(location.getId());
                             conn.setDirection("in");
 

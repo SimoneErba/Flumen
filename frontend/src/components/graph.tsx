@@ -13,6 +13,17 @@ import { MultiDirectedGraph } from "graphology";
 import { NodeSquareProgram } from "@sigma/node-square";
 import "@react-sigma/core/lib/react-sigma.min.css";
 
+// --- API CLIENT IMPORTS ---
+// (Assuming your generated client is in a folder named 'api' in the same directory)
+import {
+    LocationControllerApi,
+    LocationConnectionControllerApi,
+    LocationInput,
+    ConnectionInput,
+    UpdateModel,
+} from "../api-client/api";
+
+
 const hashToNumber = (s: string) => {
   let hash = 0;
   for (let i = 0; i < s.length; i++) {
@@ -113,7 +124,7 @@ interface EdgeEditorProps {
   data: EdgeEditorData;
   onClose: () => void;
   onSubmit: (updatedData: { speed: number; length: number; isReversed: boolean }) => void;
-  onDelete: (edgeId: string) => void;
+  onDelete: (edgeId: string, sourceId: string, targetId: string) => void;
 }
 
 const EdgeEditor = ({ data, onClose, onSubmit, onDelete }: EdgeEditorProps) => {
@@ -128,7 +139,7 @@ const EdgeEditor = ({ data, onClose, onSubmit, onDelete }: EdgeEditorProps) => {
 
   const handleDelete = () => {
     if (window.confirm(`Are you sure you want to delete the path from ${data.sourceId} to ${data.targetId}?`)) {
-      onDelete(data.edgeId);
+      onDelete(data.edgeId, data.sourceId, data.targetId);
       onClose();
     }
   };
@@ -143,10 +154,10 @@ const EdgeEditor = ({ data, onClose, onSubmit, onDelete }: EdgeEditorProps) => {
       <p><b>To:</b> {currentTargetLabel}</p>
       
       <label>Speed:</label>
-      <input type="number" value={speed} onChange={e => setSpeed(Number(e.target.value))} />
+      <input type="number" value={speed} min="0" onChange={e => setSpeed(parseFloat(e.target.value))} />
       
       <label>Length:</label>
-      <input type="number" value={length} onChange={e => setLength(Number(e.target.value))} />
+      <input type="number" value={length} min="0" onChange={e => setLength(parseFloat(e.target.value))} />
       
       <div style={buttonGroupStyle}>
         <button onClick={() => setIsReversed(!isReversed)}>
@@ -166,7 +177,7 @@ const EdgeEditor = ({ data, onClose, onSubmit, onDelete }: EdgeEditorProps) => {
 const editorStyle: React.CSSProperties = {
   position: 'absolute', top: '10px', right: '10px', background: 'white',
   padding: '10px', border: '1px solid #ccc', borderRadius: '8px',
-  boxShadow: '0 2px 10px rgba(0,0,0,0.1)', zIndex: 110, // Increased z-index
+  boxShadow: '0 2px 10px rgba(0,0,0,0.1)', zIndex: 110,
   display: 'flex', flexDirection: 'column', gap: '8px'
 };
 const buttonGroupStyle: React.CSSProperties = { display: 'flex', justifyContent: 'center', marginTop: '10px' };
@@ -180,7 +191,6 @@ interface AnimationState {
   duration: number;
 }
 
-// Interface for the visual feedback line's coordinates
 interface LineCoordinates {
   x1: number;
   y1: number;
@@ -197,6 +207,10 @@ const GraphEvents = ({ initialGraphData, setHoveredEdge }: GraphEventsProps) => 
   const sigma = useSigma();
   const registerEvents = useRegisterEvents();
   const loadGraph = useLoadGraph();
+  
+  // --- API Client Instances ---
+  const locationApi = useRef(new LocationControllerApi()).current;
+  const connectionApi = useRef(new LocationConnectionControllerApi()).current;
 
   const draggedNodeRef = useRef<string | null>(null);
   const isDraggingRef = useRef<boolean>(false);
@@ -204,14 +218,12 @@ const GraphEvents = ({ initialGraphData, setHoveredEdge }: GraphEventsProps) => 
   const [selectedNodeData, setSelectedNodeData] = useState<NodeEditorData | null>(null);
 
   const [animatingItems, setAnimatingItems] = useState<Record<string, AnimationState>>({});
-  const animatingItemsRef = useRef<Record<string, AnimationState>>(animatingItems);
+  const animatingItemsRef = useRef(animatingItems);
   animatingItemsRef.current = animatingItems;
   const animationFrameId = useRef<number | null>(null);
-
-  // In the events we cant access states becuase of closures (state have the value of whne the event handler is instatiated), so we need to use refs
-  const selectedEdgeRef = useRef(selectedEdgeData);
-  const selectedNodeRef = useRef(selectedNodeData);
-
+  
+  const selectedEdgeRef = useRef(null);
+  const selectedNodeRef = useRef(null);
   selectedEdgeRef.current = selectedEdgeData;
   selectedNodeRef.current = selectedNodeData;
 
@@ -222,12 +234,15 @@ const GraphEvents = ({ initialGraphData, setHoveredEdge }: GraphEventsProps) => 
 
   useEffect(() => {
     const graph = new MultiDirectedGraph();
+    console.log("Building graph with data:", initialGraphData); // Log the incoming data
+
     initialGraphData.locations.forEach(location => {
       graph.addNode(location.id, {
         x: location.longitude ?? hashToNumber(location.id),
         y: location.latitude ?? hashToNumber(location.id + "random"),
         label: location.name, size: 10, color: "#69b3a2",
         speed: location.speed, length: location.length,
+        id: location.id
       });
     });
     initialGraphData.locations.forEach(location => {
@@ -237,6 +252,7 @@ const GraphEvents = ({ initialGraphData, setHoveredEdge }: GraphEventsProps) => 
           y: location.latitude ?? hashToNumber(location.id + "random"),
           label: item.name, size: 8, color: "#FF0000", type: "square",
           initialLocationId: location.id,
+          id: item.id
         });
       });
     });
@@ -252,6 +268,7 @@ const GraphEvents = ({ initialGraphData, setHoveredEdge }: GraphEventsProps) => 
         const sourceLocAttrs = graph.getNodeAttributes(attrs.initialLocationId);
         const nextTargets = graph.outEdges(attrs.initialLocationId).map(edge => graph.target(edge));
         const uniqueTargets = [...new Set(nextTargets)];
+
         if (sourceLocAttrs && sourceLocAttrs.speed > 0 && uniqueTargets.length === 1) {
           const targetId = uniqueTargets[0];
           const duration = (sourceLocAttrs.length / sourceLocAttrs.speed) * 1000;
@@ -310,68 +327,167 @@ const GraphEvents = ({ initialGraphData, setHoveredEdge }: GraphEventsProps) => 
     };
   }, [sigma]);
 
-  const handleEdgeSubmit = useCallback(({ speed, length, isReversed }: { speed: number; length: number; isReversed: boolean }) => {
+  const handleEdgeSubmit = useCallback(async ({ speed, length, isReversed }: { speed: number; length: number; isReversed: boolean }) => {
     if (!selectedEdgeData) return;
     const graph = sigma.getGraph();
     const { sourceId, targetId, edgeId } = selectedEdgeData;
     const sourceOfEdit = isReversed ? targetId : sourceId;
-    graph.setNodeAttribute(sourceOfEdit, 'speed', speed);
-    graph.setNodeAttribute(sourceOfEdit, 'length', length);
+    
+    const finalSpeed = parseFloat(String(speed));
+    const finalLength = parseFloat(String(length));
+
+    // Optimistic UI update
+    graph.setNodeAttribute(sourceOfEdit, 'speed', finalSpeed);
+    graph.setNodeAttribute(sourceOfEdit, 'length', finalLength);
+    console.log(finalSpeed, finalLength)
+    // API Call to update node properties
+    try {
+        const updatePayload: UpdateModel = { id: sourceOfEdit, properties: { "speed": finalSpeed, "length": finalLength } };
+        await locationApi.updateLocation(updatePayload);
+    } catch (error) {
+        console.error("Failed to update edge properties (speed/length):", error);
+        // TODO: Add UI feedback for failed save
+    }
+
     if (isReversed) {
       if (graph.hasEdge(edgeId)) {
+        // Optimistic UI update
         graph.dropEdge(edgeId);
         graph.addEdge(targetId, sourceId, { type: 'arrow', size: 5 });
+
+        // TODO: API CALL TO REVERSE EDGE
+        // This is complex because the current API client does not seem to support deleting a single edge.
+        // A robust implementation would require:
+        // 1. An API endpoint to DELETE a specific connection (e.g., DELETE /api/connections?from=A&to=B)
+        // 2. An API call here to delete the old edge.
+        // 3. An API call to create the new edge.
+        console.warn("Edge reversal in UI only. API call for deletion is not implemented due to API limitations.");
+
+        // We can still create the new edge in the backend
+        try {
+            const connectionPayload: ConnectionInput = { location1Id: targetId, location2Id: sourceId };
+            await connectionApi.createConnection1(connectionPayload);
+        } catch (error) {
+            console.error("Failed to create reversed edge in backend:", error);
+        }
       }
     }
     sigma.refresh();
-  }, [sigma, selectedEdgeData]);
+  }, [sigma, selectedEdgeData, locationApi, connectionApi]);
 
-  const handleNodeSubmit = useCallback(({ name }: { name: string }) => {
+  const handleNodeSubmit = useCallback(async ({ name }: { name: string }) => {
     if (!selectedNodeData) return;
     const graph = sigma.getGraph();
     const { nodeId } = selectedNodeData;
-    graph.setNodeAttribute(nodeId, 'label', name);
     
+    // Optimistic UI update
+    graph.setNodeAttribute(nodeId, 'label', name);
     sigma.refresh();
-  }, [sigma, selectedNodeData]);
 
-  const handleEdgeDelete = useCallback((edgeId: string) => {
+    // API Call
+    try {
+        const updatePayload: UpdateModel = { id: nodeId, properties: { name } };
+        await locationApi.updateLocation(updatePayload);
+    } catch (error) {
+        console.error("Failed to update node name:", error);
+        // TODO: Revert UI change and show error message
+        graph.setNodeAttribute(nodeId, 'label', selectedNodeData.name); // Revert
+        sigma.refresh();
+    }
+  }, [sigma, selectedNodeData, locationApi]);
+
+  const handleEdgeDelete = useCallback(async (edgeId: string, sourceId: string, targetId: string) => {
     const graph = sigma.getGraph();
     if (graph.hasEdge(edgeId)) {
+      // Optimistic UI update
       graph.dropEdge(edgeId);
       sigma.refresh();
+      
+      await connectionApi.deleteConnection(sourceId, targetId)
     }
-  }, [sigma]);
+  }, [sigma, connectionApi]);
 
-  const handleNodeDelete = useCallback((nodeId: string) => {
+  const handleNodeDelete = useCallback(async (nodeId: string) => {
     const graph = sigma.getGraph();
     if (graph.hasNode(nodeId)) {
+      // Optimistic UI update
+      const oldNodeAttributes = graph.getNodeAttributes(nodeId);
       graph.dropNode(nodeId);
       sigma.refresh();
-    }
-  }, [sigma]);
 
-  const addNode = useCallback((x: number, y: number) => {
+      // API Call
+      try {
+          await locationApi.deleteLocation(id);
+      } catch (error) {
+          console.error("Failed to delete node:", error);
+          // TODO: Re-add node to graph and show error
+          graph.addNode(nodeId, oldNodeAttributes);
+          sigma.refresh();
+      }
+    }
+  }, [sigma, locationApi]);
+
+  const addNode = useCallback(async (x: number, y: number) => {
     const graph = sigma.getGraph();
     if (!graph) return;
+    
+    // Use a temporary ID for the optimistic UI update
     const newNodeId = crypto.randomUUID();
-    const closestNodes = graph.nodes()
-      .filter(nodeId => !graph.getNodeAttribute(nodeId, "type"))
-      .map(nodeId => {
-        const attrs = graph.getNodeAttributes(nodeId);
-        return { nodeId, distance: Math.pow(x - attrs.x, 2) + Math.pow(y - attrs.y, 2) };
-      })
-      .sort((a, b) => a.distance - b.distance)
-      .slice(0, 2);
-    graph.addNode(newNodeId, { x, y, label: "New Location", size: 10, color: "#69b3a2", speed: 10, length: 50 });
-    closestNodes.forEach(e => {
-      graph.addEdge(e.nodeId, newNodeId, { type: 'arrow', size: 5 });
-      // To make it bidirectional by default, add the reverse edge too
-      // graph.addEdge(newNodeId, e.nodeId, { type: 'arrow', size: 5 });
-    });
-  }, [sigma]);
+    const newNodeLabel = "New Location";
+    
+    // Optimistic UI update
+    graph.addNode(newNodeId, { x, y, label: newNodeLabel, size: 10, color: "#69b3a2", speed: 10, length: 50 });
+    sigma.refresh(); // Refresh to show the new node immediately
 
-  // *** MODIFIED ***: EVENT REGISTRATION (WITH ALT+DRAG FOR EDGES)
+    // API Call to create the node in the backend
+    try {
+        const locationPayload: LocationInput = {
+            id: newNodeId,
+            name: newNodeLabel,
+            longitude: x,
+            latitude: y,
+            speed: 10,
+            length: 50,
+            active: true
+        };
+        const response = await locationApi.createLocation(locationPayload);
+        
+        // Optional: If the backend returns a different ID, you might need to update the graph.
+        // This can be complex, for now we assume the frontend ID is used.
+        if (response.data.id !== newNodeId) {
+            console.log("Backend assigned a new ID:", response.data.id);
+            // Logic to replace node ID in graph if necessary
+        }
+    } catch (error) {
+        console.error("Failed to create node:", error);
+        // On failure, remove the optimistically added node
+        graph.dropNode(newNodeId);
+        sigma.refresh();
+    }
+
+  }, [sigma, locationApi]);
+
+    // --- DEBOUNCED UPDATE FOR NODE DRAGGING ---
+    const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+    const debouncedUpdateNodePosition = useCallback((nodeId: string, x: number, y: number) => {
+        if (debounceTimeoutRef.current) {
+            clearTimeout(debounceTimeoutRef.current);
+        }
+        debounceTimeoutRef.current = setTimeout(async () => {
+            try {
+                const updatePayload: UpdateModel = {
+                    id: nodeId,
+                    properties: { longitude: x, latitude: y }
+                };
+                await locationApi.updateLocation(updatePayload);
+            } catch (error) {
+                console.error("Failed to update node position:", error);
+                // TODO: Add logic to revert the node's position in the UI
+            }
+        }, 500); // 500ms delay
+    }, [locationApi]);
+
+
   useEffect(() => {
     registerEvents({
       enterEdge: ({ edge }) => setHoveredEdge(edge),
@@ -394,7 +510,7 @@ const GraphEvents = ({ initialGraphData, setHoveredEdge }: GraphEventsProps) => 
         }
         if (wasAddingEdgeRef.current) {
           wasAddingEdgeRef.current = false;
-          return; // Don't add a node if we were just adding an edge
+          return;
         }
         if (selectedEdgeRef.current) {
           setSelectedEdgeData(null);
@@ -404,9 +520,7 @@ const GraphEvents = ({ initialGraphData, setHoveredEdge }: GraphEventsProps) => 
         }
       },
       downNode: ({ node, event }) => {
-        // Check for Alt key to decide action
         if (event.original.altKey) {
-          // --- STARTING TO ADD AN EDGE ---
           wasAddingEdgeRef.current = true; 
           event.preventSigmaDefault();
           isAddingEdgeRef.current = true;
@@ -419,7 +533,6 @@ const GraphEvents = ({ initialGraphData, setHoveredEdge }: GraphEventsProps) => 
             });
           }
         } else {
-          // --- STARTING TO MOVE A NODE (existing logic) ---
           setSelectedEdgeData(null);
           if (sigma.getGraph().getNodeAttribute(node, "type") !== "square") {
             isDraggingRef.current = true;
@@ -428,44 +541,57 @@ const GraphEvents = ({ initialGraphData, setHoveredEdge }: GraphEventsProps) => 
           }
         }
       },
-      upNode: ({ node }) => {
-        // Check if we were in "add edge" mode and dropped on a different, valid node
+      upNode: async ({ node }) => {
         if (isAddingEdgeRef.current && edgeSourceNodeRef.current && edgeSourceNodeRef.current !== node) {
           const graph = sigma.getGraph();
           const source = edgeSourceNodeRef.current;
           const target = node;
           if (!graph.hasEdge(source, target)) {
+            // Optimistic UI update
             graph.addEdge(source, target, { type: 'arrow', size: 5 });
+            
+            // API Call
+            try {
+                const connectionPayload: ConnectionInput = { location1Id: source, location2Id: target };
+                await connectionApi.createConnection1(connectionPayload);
+            } catch (error) {
+                console.error("Failed to create connection:", error);
+                // On failure, remove the optimistically added edge
+                graph.dropEdge(source, target);
+            }
           }
         }
       },
       mouseup: () => {
-        // --- CLEANUP FOR ALL ACTIONS ---
         if (isAddingEdgeRef.current) {
           isAddingEdgeRef.current = false;
           edgeSourceNodeRef.current = null;
-          setLineCoordinates(null); // Hide the feedback line
+          setLineCoordinates(null);
         }
         if (isDraggingRef.current) {
-          isDraggingRef.current = false;
-          draggedNodeRef.current = null;
-          sigma.getSettings().mouseEnabled = true;
+            const draggedNodeId = draggedNodeRef.current;
+            if (draggedNodeId) {
+                const graph = sigma.getGraph();
+                const attrs = graph.getNodeAttributes(draggedNodeId);
+                // Trigger the debounced save on mouse up
+                debouncedUpdateNodePosition(draggedNodeId, attrs.x, attrs.y);
+            }
+            isDraggingRef.current = false;
+            draggedNodeRef.current = null;
+            sigma.getSettings().mouseEnabled = true;
         }
       },
       mousemove: (event) => {
-        // Handle moving a node (this part is fine)
         if (isDraggingRef.current && draggedNodeRef.current) {
           event.preventSigmaDefault();
           const pos = sigma.viewportToGraph(event);
           sigma.getGraph().setNodeAttribute(draggedNodeRef.current, "x", pos.x);
           sigma.getGraph().setNodeAttribute(draggedNodeRef.current, "y", pos.y);
-          return; // Exit early
+          return;
         }
 
-        // Handle drawing the edge line
         if (isAddingEdgeRef.current && edgeSourceNodeRef.current) {
           event.preventSigmaDefault();
-
           setLineCoordinates(coords => {
             if (!coords) return null;
             return {
@@ -482,17 +608,15 @@ const GraphEvents = ({ initialGraphData, setHoveredEdge }: GraphEventsProps) => 
         setSelectedNodeData({nodeId: node, name: attr.label})
       }
     });
-  // This stable dependency array is key to preventing bugs
-  }, [sigma, registerEvents, addNode, setHoveredEdge]);
+  }, [sigma, registerEvents, addNode, setHoveredEdge, connectionApi, debouncedUpdateNodePosition]);
 
   return (
     <>
-      {/* *** NEW ***: SVG Overlay for visual feedback when adding an edge */}
       <svg
         style={{
           position: 'absolute', top: 0, left: 0,
           width: '100%', height: '100%',
-          pointerEvents: 'none', // Allows clicks to pass through to the graph
+          pointerEvents: 'none',
           zIndex: 100,
         }}
       >
@@ -510,7 +634,7 @@ const GraphEvents = ({ initialGraphData, setHoveredEdge }: GraphEventsProps) => 
           data={selectedEdgeData}
           onSubmit={handleEdgeSubmit}
           onClose={() => setSelectedEdgeData(null)}
-          onDelete={handleEdgeDelete}
+          onDelete={(edgeId, sourceId, targetId) => handleEdgeDelete(edgeId, sourceId, targetId)}
         />
       )}
       {selectedNodeData && (

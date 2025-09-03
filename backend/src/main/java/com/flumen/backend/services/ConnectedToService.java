@@ -2,8 +2,17 @@ package com.flumen.backend.services;
 
 import com.flumen.backend.utils.OrientDBUtils;
 import com.orientechnologies.orient.core.db.ODatabaseSession;
+import com.orientechnologies.orient.core.id.ORecordId;
 import com.orientechnologies.orient.core.record.ODirection;
+import com.orientechnologies.orient.core.record.OEdge;
 import com.orientechnologies.orient.core.record.OElement;
+import com.orientechnologies.orient.core.record.OVertex;
+import com.orientechnologies.orient.core.sql.executor.OResultSet;
+import com.orientechnologies.orient.core.id.ORID;
+
+import java.util.HashMap;
+import java.util.Map;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -71,6 +80,42 @@ public class ConnectedToService {
             for (var edge : edges) {
                 edge.delete();
             }
+        }
+    }
+
+    /**
+     * Deletes all direct edges from a source vertex to a target vertex.
+     *
+     * @param sourceId The unique ID property of the source vertex.
+     * @param targetId The unique ID property of the target vertex.
+     */
+    public void deleteConnection(String sourceId, String targetId) {
+        // A helpful check to prevent errors with bad input
+        if (sourceId == null || targetId == null || sourceId.isEmpty() || targetId.isEmpty()) {
+            throw new IllegalArgumentException("Source and Target IDs cannot be null or empty.");
+        }
+
+        // This query finds the edge(s) between the two vertices and deletes them.
+        // NOTE: This assumes you have a property named 'id' on your Location/Vertex class.
+        // If your unique identifier is different (e.g., 'name' or 'uuid'), change the query accordingly.
+        String query = "DELETE EDGE E FROM (SELECT FROM V WHERE customId = :sourceId) TO (SELECT FROM V WHERE customId = :targetId)";
+
+        try (ODatabaseSession db = orientDBService.getSession()) {
+            Map<String, Object> params = new HashMap<>();
+            params.put("sourceId", sourceId);
+            params.put("targetId", targetId);
+
+            // Execute the command. The result tells you how many edges were deleted.
+            try (OResultSet rs = db.command(query, params)) {
+                long deletedCount = rs.stream().map(r -> r.<Long>getProperty("count")).findFirst().orElse(0L);
+                if (deletedCount == 0) {
+                    System.out.println("No connection found from " + sourceId + " to " + targetId + " to delete.");
+                }
+            }
+        } catch (Exception e) {
+            String errorMessage = String.format("Error while deleting connection from %s to %s: %s",
+                                                sourceId, targetId, e.getMessage());
+            throw new RuntimeException(errorMessage, e);
         }
     }
 }

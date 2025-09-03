@@ -46,4 +46,9 @@ public class LocationConnectionController {
     public void deleteConnections(@PathVariable String locationId) {
         connectedToService.deleteConnections(locationId);
     }
+
+    @DeleteMapping
+    public void deleteConnection(String sourceId, String targetId) {
+        connectedToService.deleteConnection(sourceId, targetId);
+    }
 }
